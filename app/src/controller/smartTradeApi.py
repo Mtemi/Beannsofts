@@ -13,7 +13,12 @@ from app.src.services.SmartTrades.SmartBuy.exchangeVerificaton import verifyExch
 from app.src.utils import logging
 from app.src.utils.binance.streams import ThreadedWebsocketManager
 from app.src.utils.dto import SmartTradeDto
+import sys
+import os
 from app.tasks import smartBuyTrade, smartCoverTrade, smartSellTrade, smartTrade
+sys.path.append(os.path.abspath(os.path.join(os.path.dirname(__file__), '....')))
+from manage import socketio
+import json
 
 api = SmartTradeDto.api
 smart = SmartTradeDto.smart
@@ -39,16 +44,13 @@ class SmartBuyResource(Resource):
         stop_loss_targets = request.json['stop_loss_targets']
         leverage_type = request.json['leverage_type']
         leverage_value = request.json['leverage']
+        notional_amount = float(exchange_data['amount'])
 
         print("user", user)
         userId = user.id
         print("User ID", userId)
         telegram_id = user.telegram_id
 
-
-        
-
-        
 
         user = db.session.query(UserModel).filter_by(id=userId).first()
         # as you can see here, we are passing exchange name manually. That should not be the case, where we have several exhanges.  
@@ -71,9 +73,15 @@ class SmartBuyResource(Resource):
         
         orderDetails = {}
         exchange_order_id = ""
-        price = ""
         dualSidePosition = False
 
+        last_price = OrderOperations.getSymbolLastPrice1(userId, exchangeName, symbol)
+        print(last_price)
+        price  = float(last_price)
+        real_quantity = int(notional_amount/price)
+        print("^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^")
+        print(" {} market price {} with size of {} is being posted", symbol, price, real_quantity)
+        print("***********************************")
 
         if leverage_type == "cross":
             dualSidePosition = "CROSSED"
@@ -86,19 +94,14 @@ class SmartBuyResource(Resource):
             "marginType": dualSidePosition,
         }
 
-
         # change position mode
         resp12 = OrderOperations.change_PositionMode(userId, exchangeName, orderDetails_Mode)
         print(resp12)
         print(resp12["status"])
-        print(" ^^^^^^^^^^^^^^^^^^^^^^^^^")
+        print(" ^^^^^^^^^^^CHANGING POSITION MODE^^^^^^^^^^^^^^")
         if resp12["status"] == 'ok' or resp12["status"] == 'Ok' or resp12["status"] == 'OK':
             last_price = OrderOperations.getSymbolLastPrice1(userId, exchangeName, symbol)
             print(last_price)
-
-        # resp12 = OrderOperations.CreateBinanceFuturesOrderSmartBuy(userId, exchangeName, orderDetails)
-
-
 
         orderDetails_Leverage = {
             "symbol": symbol,
@@ -108,12 +111,10 @@ class SmartBuyResource(Resource):
         resp12 = OrderOperations.set_Leverage(userId, exchangeName, orderDetails_Leverage)
         print(resp12)
         print(resp12["status"])
-        print(" ^^^^^^^^^^^^^^^^^^^^^^^^^")
+        print(" ^^^^^^^^^^^^CHANGING COIN LEVERAGE^^^^^^^^^^^^^")
         if resp12["status"] == 'ok' or resp12["status"] == 'Ok' or resp12["status"] == 'OK':
             last_price = OrderOperations.getSymbolLastPrice1(userId, exchangeName, symbol)
             print(last_price)
-
-
 
         if exch_user_info['status']:
 
@@ -122,12 +123,15 @@ class SmartBuyResource(Resource):
                     "symbol": symbol,
                     "side": "Buy",
                     "type": 'MARKET',
-                    "quantity": float(exchange_data['amount'])
+                    "quantity": real_quantity
                 }
 
                 resp12 = OrderOperations.CreateBinanceFuturesOrderSmartBuy(userId, exchangeName, orderDetails)
                 print(resp12)
                 print(resp12["status"])
+                if resp12["status"] == 'fail':
+                    print("we add a return statement here")
+                    return {"message":"Fail", "result": str(resp12["result"])}, 500
                 print(" ^^^^^^^^^^^^^^^^^^^^^^^^^")
                 if resp12["status"] == 'ok' or resp12["status"] == 'Ok' or resp12["status"] == 'OK':
                     last_price = OrderOperations.getSymbolLastPrice1(userId, exchangeName, symbol)
@@ -143,7 +147,7 @@ class SmartBuyResource(Resource):
                     "symbol": symbol,
                     "side": "Buy",
                     "type": 'LIMIT',
-                    "quantity": float(exchange_data['amount']),
+                    "quantity": real_quantity,
                     "price": float(exchange_data['amount']), #FIXME for limit you must pass the price
                     "timeInForce": "GTC"
                 }
@@ -151,6 +155,9 @@ class SmartBuyResource(Resource):
                 resp12 = OrderOperations.CreateBinanceFuturesOrderSmartBuy(userId, exchangeName, orderDetails)
                 print(resp12)
                 print(resp12["status"])
+                if resp12["status"] == 'fail':
+                    print("we add a return statement here")
+                    return {"message":"Fail", "result": str(resp12["result"])}, 500
                 print(" ^^^^^^^^^^^^^^^^^^^^^^^^^")
                 if resp12["status"] == 'ok' or resp12["status"] == 'Ok' or resp12["status"] == 'OK':
                     last_price = OrderOperations.getSymbolLastPrice1(userId, exchangeName, symbol)
@@ -244,6 +251,7 @@ class SmartBuyResource(Resource):
 
             try:
                 twm = ThreadedWebsocketManager(api_key=user_data["api_key"], api_secret=user_data["api_secret"])
+                twm1 = ThreadedWebsocketManager(api_key=user_data["api_key"], api_secret=user_data["api_secret"])
                 # I only need the price at this level 
                 # since this is a bot, smart bot, active orders reside on the bot itself .
                 # this is to allow changes to the smart orders as well as manage computations
@@ -257,6 +265,7 @@ class SmartBuyResource(Resource):
                     #stop_loss_timeout_checker(twm, stop_loss_targets['Stop_loss_timeout'])
                     #print("stop_loss_targets['stop_loss_timeout'] IS SET, so we DONT PASS")
                 twm.start()
+                twm1.start()
                 print("web socket has been started and is open")
 
                 # {'telegram_id': None, 'user_data': {'user_id': 5, 'api_key': '6rdtH7gywLNWKcicFAE5
@@ -284,7 +293,8 @@ class SmartBuyResource(Resource):
                     "order_details_json": configs1["order_details_json"],
                     } 
 
-                order_entry_price = resp["price"]
+                order_entry_price = price
+                print("order_entry_price", order_entry_price)
                 result1 = resp["order_details_json"]
                 print(" TP AND SL order_details_json ", result1)
                 take_profit_targets1 = result1["take_profit_targets"]
@@ -296,21 +306,25 @@ class SmartBuyResource(Resource):
                 print("TAKE PROFITS TARGET trailing_take_profit", float(take_profit_targets1["trailing_take_profit"]))
                 print("TRAILING STOP TARGETS trailing_stop", float(take_profit_targets1["trailing_stop"]))
                 steps1 = take_profit_targets1["take_profits"]["steps"]
+                print("steps1", steps1)
 
                 stop_loss_targets1["trailing_stop"] = take_profit_targets1["trailing_stop"]
+                print("stop_loss_targets1", stop_loss_targets1["trailing_stop"])
                 global trailing_stop
                 global trailing_buy
                 global stop_loss_price
                 trailing_stop_value = take_profit_targets1["trailing_stop"]
                 trailing_tp_value = take_profit_targets1["trailing_take_profit"]
+                print("trailing_stop_value", trailing_stop_value)
+                print("trailing_tp_value", trailing_tp_value)
 
                 if float(trailing_stop_value) > 0:
-                    trailing_stop = float(resp["price"])-float(resp["price"])*float(trailing_stop_value)/100
+                    trailing_stop = float(price)-float(price)*float(trailing_stop_value)/100
                 else: 
                     trailing_stop = 0
 
                 if float(trailing_tp_value) > 0:
-                    trailing_buy = float(resp["price"])+float(resp["price"])*float(trailing_tp_value)/100
+                    trailing_buy = float(price)+float(price)*float(trailing_tp_value)/100
                 else: 
                     trailing_buy = 0
                 print("the various take profits / the steps", steps1) 
@@ -321,8 +335,7 @@ class SmartBuyResource(Resource):
                 print("stop_loss_price", stop_loss_price)
                 symbol=resp["symbol"].replace("/", "")
                 print("symbol to querry price data", symbol) 
-                floated_stop_loss_price_target = 0
-                price = 0
+                floated_stop_loss_price_target = price
 
                 def handle_socket_message1(price_data):
                     global trailing_stop
@@ -355,19 +368,20 @@ class SmartBuyResource(Resource):
                         # if trailing_buy is hit, we adjust it and also adjsut sl
                             # trailing_buy = floated_stop_loss_price_target-floated_stop_loss_price_target*float(take_profit_targets1["trailing_take_profit"])/100
                             # price can reach set trailing buy or sl 
-                            orderDetailsa = {
-                                    "symbol": exchange_data['symbol'].replace("/", ""),
-                                    "side": "Buy",
-                                    "type": 'STOP',
-                                    "quantity": float(resp['amount']), #this is a stop order and so all total amount need be closed 
-                                    "price": float(floated_stop_loss_price_target),
-                                    "stopPrice": float(floated_stop_loss_price_target)
-                                    }
-                            
-                            resp123l = OrderOperations.CreateBinanceFuturesOrder(resp['userid'], exchangeName, orderDetailsa)
-                            print("repsonse after creating the initial stop loss",resp123l)
-                            # print(resp123l)
-                            # exchange_order_id = resp123l['orderId'] #this is a new orderId.
+                            orderDetails = {
+                                "symbol": exchange_data['symbol'].replace("/", ""),
+                                "side": "Sell",
+                                "type": 'LIMIT',
+                                "quantity": real_quantity,
+                                "price": float(floated_stop_loss_price_target), 
+                                "reduceOnly": True,
+                                "timeInForce": "GTC"
+                            }
+                            resp123l = OrderOperations.CreateBinanceFuturesOrderSmartBuy(userId, exchangeName, orderDetails)
+                            print(resp123l)
+                            print(resp123l["status"])
+                            exchange_order_id = resp123l["result"]["orderId"]
+                            print("exchange_order_id ", exchange_order_id)
                             # new_order_price = float(trailing_stop)-0.002*float(trailing_stop) # this new order price is good
                             # # above price will be used when and if we to enter  a limit order 
                             # # will clarify this from the client
@@ -397,30 +411,33 @@ class SmartBuyResource(Resource):
                             #     # db.session.query(SmartOrdersModel).filter(SmartOrdersModel.id == resp['userid']).update(SmartOrdersModel.status == 'filled')
                             #     # db.session.commit() 
 
-
                     # print("trailing_stop final", trailing_stop)
                     # print("trailing_buy final", trailing_buy)
                     # these sl steps a locking profits by  updating trailing Buy 
-                    # print("sl steps",sl_steps)
+                    print("sl steps",sl_steps)
                     sl_stepss = int(sl_steps)
                     for i in range(sl_stepss):
 
                         # the below if is a limit order but without trailing_take_profit
                         # else: # trailing_buy is zero, this means off
                         if stop_loss_price == floated_stop_loss_price_target or floated_stop_loss_price_target < stop_loss_price :
-                            print(f'Stop Loss Price Number: {i} has been hit at a price of {floated_stop_loss_price_target}. It will be re-adjusted downwards as per set steps')
-                            orderDetailsa = {
-                                    "symbol": exchange_data['symbol'].replace("/", ""),
-                                    "side": "Buy",
-                                    "type": 'STOP',
-                                    "quantity": float(resp['amount']), #this is a stop order and so all total amount need be closed 
-                                    "price": float(stop_loss_price),
-                                    "stopPrice": float(stop_loss_price)
-                                    }
-                            resp123l = OrderOperations.CreateBinanceFuturesOrder(resp['userid'], exchangeName, orderDetailsa)
-                            print("repsonse after creating the initial stop loss",resp123l)
+
+                            orderDetails = {
+                                "symbol": exchange_data['symbol'].replace("/", ""),
+                                "side": "Sell",
+                                "type": 'LIMIT',
+                                "quantity": real_quantity,
+                                "price": float(floated_stop_loss_price_target), 
+                                "reduceOnly": True,
+                                "timeInForce": "GTC"
+                            }
+
+                            resp123l = OrderOperations.CreateBinanceFuturesOrderSmartBuy(resp['userid'], exchangeName, orderDetails)
                             print(resp123l)
-                            resp123l['orderId'] #this is a new orderId.
+                            print(resp123l["status"])
+                            exchange_order_id = resp123l["result"]["orderId"]
+                            print("exchange_order_id ", exchange_order_id)
+
                             new_order_price = float(stop_loss_price)-0.002*float(stop_loss_price) # this new order price is good
                             stop_loss_price=new_order_price-(new_order_price*float(stop_loss_11)/100)
                             result1["stop_loss_targets"]["stop_loss_price"] = stop_loss_price
@@ -430,10 +447,13 @@ class SmartBuyResource(Resource):
                                 "symbol": exchange_data['symbol'].replace("/", ""),
                                 "side": "Buy",
                                 "type": 'MARKET',
-                                "quantity": float(resp['amount'])
+                                "quantity": real_quantity
                             }
                             resp12 = OrderOperations.CreateBinanceFuturesOrder(resp['userid'], exchangeName, orderDetails223)
                             print("repsonse after creating the initial stop loss",resp12)
+                            exchange_order_id = resp12["result"]["orderId"]
+                            print("exchange_order_id ", exchange_order_id)
+                            twm.start()
                             # exchange_order_id = resp12["orderId"]
                             # print(resp12)
 
@@ -450,6 +470,10 @@ class SmartBuyResource(Resource):
 
                         sl_stepss = sl_stepss-1
 
+                    steps2 = steps1
+                    # print(f'JSON PAYLOAD TO LOOP: {steps2}')
+                    size_of_tp = len(steps1)
+                    # print(f'Size of data: {size_of_tp} in INT')
                     #end of checking stop loss conditions
                     # tp computations start here
                     # these tp steps a locking profits by  updating stop loss and trailing stop values/trailing buy
@@ -470,19 +494,22 @@ class SmartBuyResource(Resource):
                             print("price fetched from the Binance futures websocket streams" , trailing_buy)
                             # if price11 == trailing_buy or trailing_buy > price11: # it means here that the target has been hit
                             # the res as a new config then I will update this new TP steps to the   smart order
-                            orderDetailsa = {
-                                    "symbol": exchange_data['symbol'].replace("/", ""),
-                                    "side": "Buy",
-                                    "type": 'STOP',
-                                    "quantity": float(resp['amount']), #this is a stop order and so all total amount need be closed 
-                                    "price": float(trailing_buy),
-                                    "stopPrice": float(trailing_buy)
-                                    }
-                            
-                            resp123l = OrderOperations.CreateBinanceFuturesOrder(resp['userid'], exchangeName, orderDetailsa)
-                            print("repsonse after creating the initial stop loss",resp123l)
+
+                            orderDetails = {
+                                "symbol": exchange_data['symbol'].replace("/", ""),
+                                "side": "Sell",
+                                "type": 'LIMIT',
+                                "quantity": real_quantity,
+                                "price": float(floated_stop_loss_price_target), 
+                                "reduceOnly": True,
+                                "timeInForce": "GTC"
+                            }
+                            resp123l = OrderOperations.CreateBinanceFuturesOrderSmartBuy(resp['userid'], exchangeName, orderDetails)
                             print(resp123l)
-                            resp123l['orderId'] #this is a new orderId.
+                            print(resp123l["status"])
+                            resp123l['result']['orderId'] #this is a new orderId.
+                            exchange_order_id = resp123l["result"]["orderId"]
+                            print("exchange_order_id ", exchange_order_id)
                             new_order_price = float(trailing_stop)-0.002*float(trailing_stop) # this new order price is good
                             # above price will be used when and if we to enter  a limit order 
                             # will clarify this from the client
@@ -494,10 +521,13 @@ class SmartBuyResource(Resource):
                                 "symbol": exchange_data['symbol'].replace("/", ""),
                                 "side": "Buy",
                                 "type": 'MARKET',
-                                "quantity": float(resp['amount'])
+                                "quantity": real_quantity
                             }
                             resp12 = OrderOperations.CreateBinanceFuturesOrder(resp['userid'], exchangeName, orderDetails223)
                             print("repsonse after creating the initial stop loss",resp12)
+                            exchange_order_id = resp12["result"]["orderId"]
+                            print("exchange_order_id ", exchange_order_id)
+                            twm.start()
                             # exchange_order_id = resp12["orderId"]
                             # print(resp12)
 
@@ -517,18 +547,13 @@ class SmartBuyResource(Resource):
                                 # db.session.query(SmartOrdersModel).filter(SmartOrdersModel.id == resp['userid'], SmartOrdersModel.exchange_order_id == exchange_order_id).update(SmartOrdersModel.exchange_order_id == exchange_order_id, SmartOrdersModel.amt == new_order_quantity, SmartOrdersModel.price == str(new_order_price), SmartOrdersModel.order_details_json == result1)
                                 # db.session.commit() 
 
-                    steps2 = steps1
-                    # print(f'JSON PAYLOAD TO LOOP: {steps2}')
-                    size_of_tp = len(steps1)
-                    # print(f'Size of data: {size_of_tp} in INT')
 
                     for i in range(size_of_tp):
-
                         # else: 
                         # price11 = float(steps2[i]["price"])
                         price11 = floated_stop_loss_price_target+floated_stop_loss_price_target*float(steps2[i]["price"])/100  # noqa: E501
                         # but again the quntity below need be a certain % of our position value in usd 
-                        quantity11 = float(steps2[i]["quantity"]) # was calculated during entry
+                        quantity11 = int(real_quantity*float(steps2[i]["quantity"])/100) # was calculated during entry
                         print(f'price of takeProfit : {i} is {price11}')
                         # print("data streamed from binance streams where we want to get the price", floated_stop_loss_price_target)
                         # print("the price above will be used to compare with the set tp price")
@@ -536,22 +561,23 @@ class SmartBuyResource(Resource):
                         if price11 == floated_stop_loss_price_target or floated_stop_loss_price_target > price11 : # it means here that the target has been hit
                             # the res as a new config then I will update this new TP steps to the   smart order
                             result1["take_profit_targets"]["take_profits"]["steps"][0] == steps2
-                            orderDetailsata = {
-                                    "symbol": exchange_data['symbol'].replace("/", ""),
-                                    "side": "Buy",
-                                    "type": 'TAKE_PROFIT',
-                                    "quantity": quantity11, #this is a tp and we need close a little amounts 
-                                    "price": float(price11),
-                                    "stopPrice": float(price11)
-                                    }
-                    
-                            resp123l = OrderOperations.CreateBinanceFuturesOrder(resp['userid'], exchangeName, orderDetailsata)
-                            print("repsonse after creating the initial stop loss",resp123l)
+                            
+                            orderDetails = {
+                                "symbol": exchange_data['symbol'].replace("/", ""),
+                                "side": "Sell",
+                                "type": 'LIMIT',
+                                "quantity": quantity11,
+                                "price": float(floated_stop_loss_price_target), 
+                                "reduceOnly": True,
+                                "timeInForce": "GTC"
+                            }
+                            resp123l = OrderOperations.CreateBinanceFuturesOrderSmartBuy(resp['userid'], exchangeName, orderDetails)
                             print(resp123l)
-                            result1["take_profit_targets"]["take_profits"]["steps"][0] == steps2
+                            print(resp123l["status"])
+                            exchange_order_id = resp123l["result"]["orderId"]
+                            print("exchange_order_id ", exchange_order_id)
 
                             if resp123l: 
-                                resp123l['orderId'] #this is a new orderId.
                                 new_order_price = float(steps2[i]["price"]) # this new order price is good and thus cannot be a limit order
                                 # but will be updated on the smartOrder price.  This is very necessary incase price starts going down and needs
                                 # to follow the rules of the SL
@@ -576,20 +602,27 @@ class SmartBuyResource(Resource):
                     # these tp steps a locking profits by  updating stop loss and trailing stop values/trailing buy
                         
                     return floated_stop_loss_price_target
-
+                
+                @socketio.on('user_event')
                 def handle_user_data(msg):
                     logger.info("_____Msg__________")
-                    print(msg)
-                    if msg['m'] == False:
-                        twm.stop()
-                        logger.info("msg['m']")
-                        return {"message":"Trade Clossed Successfully", "status":400},200
-                     
-                        
-                    print(msg)
+                    print(msg) 
+                    socketio.emit(msg)
+                    print(json.dumps(msg, indent=4))
 
-                twm.start_trade_socket(callback=handle_user_data, symbol=symbol)
+                    # if msg['m'] == True:
+                    #     twm1.stop()
+                    #     twm.stop()
+                    #     logger.info("msg['m']")
+                    #     return {"message":"Trade Clossed Successfully", "status":400},200
+                    # print(msg)
+
+                # twm1.start_trade_socket(callback=handle_user_data, symbol=symbol)
+                twm1.start_user_socket(callback=handle_user_data)
                 twm.start_symbol_book_ticker_socket(callback=handle_socket_message1, symbol=symbol)
+                
+
+                # twm.start()
                 print("updated", floated_stop_loss_price_target)
                 
                 # while it's true that we have the streamed live data above 
@@ -618,7 +651,7 @@ class SmartBuyResource(Resource):
 
                     # twm.start_symbol_book_ticker_socket(
                     #     callback=handle_socket_message, symbol=exchange_data["symbol"])
-
+                    twm1.join()  
                     twm.join()  
                     # continue checking until all conditions are met execute the order and close the tasks                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                          
                 

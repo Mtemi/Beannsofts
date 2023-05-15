@@ -1,0 +1,12 @@
+COINBASE_WEBHOOK_SECRET = 'f2dead8e-4c31-47e3-89d9-36f894d374a0'
+MAIL_USERNAME = 'email'
+MAIL_PASSWORD = 'password'
+TELEGRAM_BOT_TOKEN = '5541534872:AAEJRDjvpQgrqjSNa2zfsyIeDJ8zz-CZNUQ'
+TELEGRAM_WEBHOOK_URL ='https://api.3commas.crypttops.com/telegram/webhook/add/user'
+PORT = 5000
+PG_DATABASE_URL = 'postgresql://postgres:4PgQAlMB9VDV60HqkPV3@containers-us-west-48.railway.app:7>
+REDIS_URL = 'redis://default:BInZa1MeLpKls1XLT0bp@containers-us-west-23.railway.app:6321'
+MONGO_URL = 'mongodb://mongo:NwhYOIoKLXMIdc4OAKO6@containers-us-west-44.railway.app:7698'
+TELEGRAM_BOT_BASE_URL='https://t.me/crypttops3commas_bot?start='
+
+

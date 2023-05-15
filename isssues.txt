@@ -1,0 +1,106 @@
+1. add exchange-----
+    payload = {
+        "exchange_id": 10,
+        "exch_name": "myexchange",
+        "api_key": "EFUY8rAzUHf3vSmQh14xa2wNl8XwuOo4bonnxlXftALk54UlX6wBmqEiPe0mYAI0",
+        "api_secret": "AVEwgQN48qKF7wdxQOXr2aeycYoG32H5b0cZCbRL4JrGtDkHuzrA4RxrNDHxkGps",
+        "exchange": "binance"
+    }
+    operations--
+        -create the first -ok
+        -create another exchange ...denies with subscription-- ok
+            -todo --test for an added subscription -- pending
+        -
+    ok
+2. list exchanges -----
+    payload = None
+    ok
+
+3.update exchanges --- 
+    payload = {
+    "exch_name": "myexchange1",
+    "api_key": "EFUY8rAzUHf3vSmQh14xa2wNl8XwuOo4bonnxlXftALk54UlX6wBmqEiPe0mYAI0",
+    "api_secret": "AVEwgQN48qKF7wdxQOXr2aeycYoG32H5b0cZCbRL4JrGtDkHuzrA4RxrNDHxkGps",
+    "exchange": "binance"
+    }
+
+    operations--
+        -exchange update issue
+            --add check if exchange_name exists
+            --fix ok
+
+4.delete exchange ----
+    payload = {
+        "exch_name": "myexchange",
+        "exchange": "binance"
+    }
+
+    operations issues---
+        -exchange delete executing all the time
+            -fix check exchange or return 404 not found by checking if exchange name exists in exchange table
+            -fix ok
+
+5.asset balance on exchange ----
+    payload = {
+        "exch_name": "myexchange"
+    }
+
+    operations issues---
+        -no exchange check before proceed
+            -fix check exchange or return 404 not found by checking if exchange name exists in exchange table
+            -fix ok
+
+
+//////// current issues ////////
+delete exchange cannot work if exchange is associated with a terminal order(no cascade in TerminalOrderModel )
+
+
+/////start terminal order test
+----list terminal orders endpoint
+    -test ok
+
+---create terminal order
+payload = {
+  "exchange_id": 14,
+  "symbol": "BTC/USDT",
+  "side": "sell",
+  "type": "market",
+  "amt": 20,
+  "unit": 10,
+  "price": 10,
+  "timeinforce": "now",
+  "leverage": 12,
+  "targetprice": 111,
+  "triggerprice": 23,
+  "timeout": 45,
+  "trailing": 35
+}
+result = {
+    "result": [
+        {
+            "orderid": 9,
+            "exchange_id": 14,
+            "userid": 23,
+            "symbol": "BTC/USDT",
+            "side": "sell",
+            "type": "market",
+            "unit": 10.0,
+            "amt": 20.0,
+            "price": 10.0,
+            "leverage": 12,
+            "targetprice": 111.0,
+            "timeout": 45,
+            "trailing": 35.0,
+            "created_on": "2022-05-20 13:33:05.919394",
+            "modified_on": "None",
+            "status": "open",
+            "executed_on": "None",
+            "change_reason": null
+        }
+}
+test -api--OK
+
+-----update terminal order
+    issues
+    --updates task exchange_id only
+    --creates task id

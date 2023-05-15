@@ -1,0 +1,4 @@
+
+
+REDIS_URL = 'redis://default:MJBgBwTE2nYickmv28JU@containers-us-west-23.railway.app:6321'
+REDIS_URL = "redis://localhost:6379"
