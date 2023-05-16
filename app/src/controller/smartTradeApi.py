@@ -17,9 +17,10 @@ import sys
 import os
 from app.tasks import smartBuyTrade, smartCoverTrade, smartSellTrade, smartTrade
 sys.path.append(os.path.abspath(os.path.join(os.path.dirname(__file__), '....')))
-from manage import socketio
+from flask_socketio import SocketIO
 import json
 
+socketio = SocketIO(cors_allowed_origins="*")
 api = SmartTradeDto.api
 smart = SmartTradeDto.smart
 # Notification class instance
@@ -377,11 +378,8 @@ class SmartBuyResource(Resource):
                                 "reduceOnly": True,
                                 "timeInForce": "GTC"
                             }
-                            resp123l = OrderOperations.CreateBinanceFuturesOrderSmartBuy(userId, exchangeName, orderDetails)
+                            resp123l = OrderOperations.CreateBinanceFuturesOrderSmartBuy(resp['userid'], exchangeName, orderDetails)
                             print(resp123l)
-                            print(resp123l["status"])
-                            exchange_order_id = resp123l["result"]["orderId"]
-                            print("exchange_order_id ", exchange_order_id)
                             # new_order_price = float(trailing_stop)-0.002*float(trailing_stop) # this new order price is good
                             # # above price will be used when and if we to enter  a limit order 
                             # # will clarify this from the client
@@ -395,7 +393,7 @@ class SmartBuyResource(Resource):
                             #     "type": 'MARKET',
                             #     "quantity": float(resp['amount'])
                             # }
-                            # resp12 = OrderOperations.CreateBinanceFuturesOrder(resp['userid'], exchangeName, orderDetails223)
+                            # resp12 = OrderOperations.CreateBinanceFuturesOrderSmartBuy(resp['userid'], exchangeName, orderDetails223)
                             # print("repsonse after creating the initial stop loss",resp12)
                             # exchange_order_id = resp12["orderId"]
                             # print(resp12)
@@ -434,9 +432,6 @@ class SmartBuyResource(Resource):
 
                             resp123l = OrderOperations.CreateBinanceFuturesOrderSmartBuy(resp['userid'], exchangeName, orderDetails)
                             print(resp123l)
-                            print(resp123l["status"])
-                            exchange_order_id = resp123l["result"]["orderId"]
-                            print("exchange_order_id ", exchange_order_id)
 
                             new_order_price = float(stop_loss_price)-0.002*float(stop_loss_price) # this new order price is good
                             stop_loss_price=new_order_price-(new_order_price*float(stop_loss_11)/100)
@@ -449,11 +444,11 @@ class SmartBuyResource(Resource):
                                 "type": 'MARKET',
                                 "quantity": real_quantity
                             }
-                            resp12 = OrderOperations.CreateBinanceFuturesOrder(resp['userid'], exchangeName, orderDetails223)
+                            resp12 = OrderOperations.CreateBinanceFuturesOrderSmartBuy(resp['userid'], exchangeName, orderDetails223)
                             print("repsonse after creating the initial stop loss",resp12)
                             exchange_order_id = resp12["result"]["orderId"]
                             print("exchange_order_id ", exchange_order_id)
-                            twm.start()
+                            # twm.start()
                             # exchange_order_id = resp12["orderId"]
                             # print(resp12)
 
@@ -506,10 +501,6 @@ class SmartBuyResource(Resource):
                             }
                             resp123l = OrderOperations.CreateBinanceFuturesOrderSmartBuy(resp['userid'], exchangeName, orderDetails)
                             print(resp123l)
-                            print(resp123l["status"])
-                            resp123l['result']['orderId'] #this is a new orderId.
-                            exchange_order_id = resp123l["result"]["orderId"]
-                            print("exchange_order_id ", exchange_order_id)
                             new_order_price = float(trailing_stop)-0.002*float(trailing_stop) # this new order price is good
                             # above price will be used when and if we to enter  a limit order 
                             # will clarify this from the client
@@ -523,11 +514,11 @@ class SmartBuyResource(Resource):
                                 "type": 'MARKET',
                                 "quantity": real_quantity
                             }
-                            resp12 = OrderOperations.CreateBinanceFuturesOrder(resp['userid'], exchangeName, orderDetails223)
+                            resp12 = OrderOperations.CreateBinanceFuturesOrderSmartBuy(resp['userid'], exchangeName, orderDetails223)
                             print("repsonse after creating the initial stop loss",resp12)
                             exchange_order_id = resp12["result"]["orderId"]
                             print("exchange_order_id ", exchange_order_id)
-                            twm.start()
+                            # twm.start()
                             # exchange_order_id = resp12["orderId"]
                             # print(resp12)
 
@@ -573,27 +564,24 @@ class SmartBuyResource(Resource):
                             }
                             resp123l = OrderOperations.CreateBinanceFuturesOrderSmartBuy(resp['userid'], exchangeName, orderDetails)
                             print(resp123l)
-                            print(resp123l["status"])
-                            exchange_order_id = resp123l["result"]["orderId"]
-                            print("exchange_order_id ", exchange_order_id)
 
-                            if resp123l: 
-                                new_order_price = float(steps2[i]["price"]) # this new order price is good and thus cannot be a limit order
-                                # but will be updated on the smartOrder price.  This is very necessary incase price starts going down and needs
-                                # to follow the rules of the SL
-                                # it automatically becomes a market order
-                                #if a step is hit, I should remove it from steps and update SmartOrdersModel
-                                result1["stop_loss_targets"]["stop_loss_price"] = float(resp['price']) # for tp, entry price becomes sl 
-                                resp['price'] = steps2[i]["price"]  # then after entry becoming sl, we also make entry same value as hit tp
-                                steps2.remove(i) #after removing a step from the TPs available, I will add the step2 param to 
-                                # resp["order_details_json"] = result1
-                                # below is a new Binance Futures Order with the new entry price as calculated above
-                                #the order is still open as a smart order, so we are yet to update it as filled
+                            # if resp123l: 
+                            new_order_price = float(steps2[i]["price"]) # this new order price is good and thus cannot be a limit order
+                            # but will be updated on the smartOrder price.  This is very necessary incase price starts going down and needs
+                            # to follow the rules of the SL
+                            # it automatically becomes a market order
+                            #if a step is hit, I should remove it from steps and update SmartOrdersModel
+                            result1["stop_loss_targets"]["stop_loss_price"] = float(resp['price']) # for tp, entry price becomes sl 
+                            resp['price'] = steps2[i]["price"]  # then after entry becoming sl, we also make entry same value as hit tp
+                            steps2.remove(i) #after removing a step from the TPs available, I will add the step2 param to 
+                            # resp["order_details_json"] = result1
+                            # below is a new Binance Futures Order with the new entry price as calculated above
+                            #the order is still open as a smart order, so we are yet to update it as filled
 
-                                steps2.remove(i) #after removing a step from the TPs available, I will add the step2 param to 
-                                # print("the order is still open as a smart order, so we are yet to update it as filled")
-                                # db.session.query(SmartOrdersModel).filter(SmartOrdersModel.id == resp['userid'], SmartOrdersModel.exchange_order_id == exchange_order_id).update(SmartOrdersModel.exchange_order_id == exchange_order_id, SmartOrdersModel.amt == new_order_quantity, SmartOrdersModel.price == str(new_order_price), SmartOrdersModel.order_details_json == result1)
-                                # db.session.commit() 
+                            steps2.remove(i) #after removing a step from the TPs available, I will add the step2 param to 
+                            # print("the order is still open as a smart order, so we are yet to update it as filled")
+                            # db.session.query(SmartOrdersModel).filter(SmartOrdersModel.id == resp['userid'], SmartOrdersModel.exchange_order_id == exchange_order_id).update(SmartOrdersModel.exchange_order_id == exchange_order_id, SmartOrdersModel.amt == new_order_quantity, SmartOrdersModel.price == str(new_order_price), SmartOrdersModel.order_details_json == result1)
+                            # db.session.commit() 
 
                         size_of_tp = size_of_tp-1
 
@@ -606,22 +594,22 @@ class SmartBuyResource(Resource):
                 @socketio.on('user_event')
                 def handle_user_data(msg):
                     logger.info("_____Msg__________")
-                    print(msg) 
-                    socketio.emit(msg)
+                    # print(msg) 
+                    # socketio.emit(msg)
                     print(json.dumps(msg, indent=4))
 
-                    # if msg['m'] == True:
+                    # if msg['m'] == "True":
                     #     twm1.stop()
                     #     twm.stop()
                     #     logger.info("msg['m']")
-                    #     return {"message":"Trade Clossed Successfully", "status":400},200
+                    #     # return {"message":"Trade Clossed Successfully", "status":400},200
                     # print(msg)
 
                 # twm1.start_trade_socket(callback=handle_user_data, symbol=symbol)
-                twm1.start_user_socket(callback=handle_user_data)
+                # twm1.start_trade_socket(callback=handle_user_data,  symbol=symbol)
+                # twm1.start_user_socket(callback=handle_user_data)
                 twm.start_symbol_book_ticker_socket(callback=handle_socket_message1, symbol=symbol)
                 
-
                 # twm.start()
                 print("updated", floated_stop_loss_price_target)
                 

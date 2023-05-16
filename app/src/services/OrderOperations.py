@@ -260,6 +260,48 @@ def getSymbolLastPrice1(user, exchange_name, symbol):
     lastPrice = BinanceSpotClient.lastPrice
     return lastPrice
 
+
+
+def cancelBinanceFuturesOrderSmartBuy(user, exchange_name, orderDetails):
+    ApiData = fetchBinanceKeys(user, exchange_name)
+    print('ApiData')
+    print(ApiData)
+    print("exchange_name")
+    print(exchange_name)
+    key = ApiData.key
+    secret = ApiData.secret
+
+    try:
+        BinanceFuturesClient = BinanceFuturesOps(api_key=key, api_secret=secret, trade_symbol=orderDetails['symbol'])
+        cancelledOrder = BinanceFuturesClient.cancelOrder(orderDetails)
+        print(cancelledOrder)
+
+        if cancelledOrder != False:
+            resp = {
+                "status": "OK",
+                "result": cancelledOrder,  
+                "status_code" :200        
+            }
+            return resp
+        else:
+            resp = {
+                "status": "OK",
+                "result": [], 
+                "status_code":200          
+            }
+            return resp
+
+    except Exception as e:
+        logger.exception("Create Order Exception")
+        resp = {
+            "status": "fail",
+            "result": str(e),
+            "message": "error occured. Check parameters",
+            "status_code":400           
+        }
+        return resp
+
+
 def CreateBinanceFuturesOrderSmartBuy(user, exchange_name, orderDetails):
     ApiData = fetchBinanceKeys(user, exchange_name)
     print('ApiData')
@@ -621,3 +663,83 @@ def createBinanceTerminalFuturesOrders(userId, exchangeId, orderDetails):
             "message": "invalid api keys"
         }
         return resp, 200
+
+
+def set_Leverage(user, exchange_name, orderDetails):
+    ApiData = fetchBinanceKeys(user, exchange_name)
+    print('ApiData')
+    print(ApiData)
+    print("exchange_name")
+    print(exchange_name)
+    key = ApiData.key
+    secret = ApiData.secret
+
+    try:
+        BinanceFuturesClient = BinanceFuturesOps(api_key=key, api_secret=secret, trade_symbol=orderDetails['symbol'])
+        newOrder = BinanceFuturesClient.setLeverage(orderDetails)
+        print(newOrder)
+
+        if newOrder != False:
+            resp = {
+                "status": "OK",
+                "result": newOrder,  
+                "status_code" :200        
+            }
+            return resp
+        else:
+            resp = {
+                "status": "OK",
+                "result": [], 
+                "status_code":200          
+            }
+            return resp
+
+    except Exception as e:
+        logger.exception("Create Order Exception")
+        resp = {
+            "status": "fail",
+            "result": str(e),
+            "message": "error occured. Check parameters",
+            "status_code":400           
+        }
+        return resp
+    
+
+def change_PositionMode(user, exchange_name, orderDetails):
+    ApiData = fetchBinanceKeys(user, exchange_name)
+    print('ApiData')
+    print(ApiData)
+    print("exchange_name")
+    print(exchange_name)
+    key = ApiData.key
+    secret = ApiData.secret
+
+    try:
+        BinanceFuturesClient = BinanceFuturesOps(api_key=key, api_secret=secret, trade_symbol=orderDetails['symbol'])
+        newOrder = BinanceFuturesClient.changePositionMode(orderDetails)
+        print(newOrder)
+
+        if newOrder != False:
+            resp = {
+                "status": "OK",
+                "result": newOrder,  
+                "status_code" :200        
+            }
+            return resp
+        else:
+            resp = {
+                "status": "OK",
+                "result": [], 
+                "status_code":200          
+            }
+            return resp
+
+    except Exception as e:
+        logger.exception("Create Order Exception")
+        resp = {
+            "status": "fail",
+            "result": str(e),
+            "message": "error occured. Check parameters",
+            "status_code":400           
+        }
+        return resp

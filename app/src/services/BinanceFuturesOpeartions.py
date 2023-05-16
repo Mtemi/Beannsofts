@@ -282,45 +282,18 @@ class BinanceFuturesOps(BinanceClient):
         else:
             return self.is_authentic
 
-    # FIXME This method needs a serious rethink. and redesign
 
-    def orderToPlaceProcessor(self, params):
-        # TODO check previous positions
-
-        print("____params___check----", params)
-        order_basics = {"symbol": params["symbol"], "type": params['type'],
-                        "side": params["side"], "quantity": self.round_decimals_down(params["quantity"],self.qtyPrecision)}
-
+    def cancelOrder(self, params):
+        print("CANCELLING ORDER PARAMS",params)
         open_orders = self.checkAllOPenOrders()
         print('Open Order', open_orders)
         if open_orders == False:
-            if params["type"] == 'MARKET':
-                pass
-            elif params["type"] == 'LIMIT':
-                order_basics.update(self.LimitOrder(params))
-
-            elif params["type"] == 'TAKE_PROFIT':
-                order_basics.update(self.takeProfitOrder(params))
-            
-            elif params["type"] == 'STOP' :
-                order_basics.update(self.StopOrder(params))
-
-            elif params["type"] == 'STOP_MARKET':
-                order_basics.update(self.stopMarket(params))
-
-            elif params["type"] == 'TAKE_PROFIT_MARKET' :
-                order_basics.update(self.TakeProfitMarket(params))
-
-            elif params["type"] == 'TRAILING_STOP_MARKET':
-                order_basics.update(self.trailingStopMarket(params))
-
-            print("paramsssssssssss", order_basics)
-            return order_basics
+            print("there are no open orders TO CLOSE")
+            print("there are no open orders TO CLOSE")
+            print("there are no open orders TO CLOSE")
+            return False
         else:
             print("This code executed")
-            # extract side
-            # extract quantity
-            # leverage
             positionQty = open_orders[0]['origQty']
             positionSide = open_orders[0]['side']
             positionOrderId = open_orders[0]['orderId']
@@ -332,29 +305,79 @@ class BinanceFuturesOps(BinanceClient):
 
             cancel_ret = self.futures_cancel_all_open_orders(**paramsCancel)
             print('cancel order------------ ', cancel_ret)
+            return cancel_ret
 
-            if params["type"] == 'MARKET':
-                pass
-            elif params["type"] == 'LIMIT':
-                order_basics.update(self.LimitOrder(params))
+    def orderToPlaceProcessor(self, params):
+        # TODO check previous positions
 
-            elif params["type"] == 'TAKE_PROFIT':
-                order_basics.update(self.takeProfitOrder(params))
+        print("____params___check----", params)
+        order_basics = {"symbol": params["symbol"], "type": params['type'],
+                        "side": params["side"], "quantity": self.round_decimals_down(params["quantity"],self.qtyPrecision)}
+
+        # open_orders = self.checkAllOPenOrders()
+        # print('Open Order', open_orders)
+        # if open_orders == False:
+        if params["type"] == 'MARKET':
+            pass
+        elif params["type"] == 'LIMIT':
+            order_basics.update(self.LimitOrder(params))
+
+        elif params["type"] == 'TAKE_PROFIT':
+            order_basics.update(self.takeProfitOrder(params))
+        
+        elif params["type"] == 'STOP' :
+            order_basics.update(self.StopOrder(params))
+
+        elif params["type"] == 'STOP_MARKET':
+            order_basics.update(self.stopMarket(params))
+
+        elif params["type"] == 'TAKE_PROFIT_MARKET' :
+            order_basics.update(self.TakeProfitMarket(params))
+
+        elif params["type"] == 'TRAILING_STOP_MARKET':
+            order_basics.update(self.trailingStopMarket(params))
+
+        print("paramsssssssssss", order_basics)
+        return order_basics
+        # else:
+        #     print("This code executed")
+        #     # extract side
+        #     # extract quantity
+        #     # leverage
+        #     positionQty = open_orders[0]['origQty']
+        #     positionSide = open_orders[0]['side']
+        #     positionOrderId = open_orders[0]['orderId']
+
+        #     paramsCancel = {
+        #         "orderId": positionOrderId,
+        #         "symbol":self.trade_symbol
+        #     }
+
+        #     cancel_ret = self.futures_cancel_all_open_orders(**paramsCancel)
+        #     print('cancel order------------ ', cancel_ret)
+
+        #     if params["type"] == 'MARKET':
+        #         pass
+        #     elif params["type"] == 'LIMIT':
+        #         order_basics.update(self.LimitOrder(params))
+
+        #     elif params["type"] == 'TAKE_PROFIT':
+        #         order_basics.update(self.takeProfitOrder(params))
             
-            elif params["type"] == 'STOP' :
-                order_basics.update(self.StopOrder(params))
+        #     elif params["type"] == 'STOP' :
+        #         order_basics.update(self.StopOrder(params))
 
-            elif params["type"] == 'STOP_MARKET':
-                order_basics.update(self.stopMarket(params))
+        #     elif params["type"] == 'STOP_MARKET':
+        #         order_basics.update(self.stopMarket(params))
 
-            elif params["type"] == 'TAKE_PROFIT_MARKET' :
-                order_basics.update(self.TakeProfitMarket(params))
+        #     elif params["type"] == 'TAKE_PROFIT_MARKET' :
+        #         order_basics.update(self.TakeProfitMarket(params))
 
-            elif params["type"] == 'TRAILING_STOP_MARKET':
-                order_basics.update(self.trailingStopMarket(params))
+        #     elif params["type"] == 'TRAILING_STOP_MARKET':
+        #         order_basics.update(self.trailingStopMarket(params))
 
-            print("paramsssssssssss", order_basics)
-            return order_basics
+        #     print("paramsssssssssss", order_basics)
+        #     return order_basics
     
     def checkPositionInfo(self):
         if self.is_authentic == True:
