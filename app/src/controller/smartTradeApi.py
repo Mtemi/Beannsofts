@@ -250,6 +250,9 @@ class SmartBuyResource(Resource):
             exchangeName = configs1['exchange_name']
             print("exchangeName", exchangeName)
 
+            global loop_status
+            loop_status = True
+
             try:
                 twm = ThreadedWebsocketManager(api_key=user_data["api_key"], api_secret=user_data["api_secret"])
                 twm1 = ThreadedWebsocketManager(api_key=user_data["api_key"], api_secret=user_data["api_secret"])
@@ -380,6 +383,9 @@ class SmartBuyResource(Resource):
                             }
                             resp123l = OrderOperations.CreateBinanceFuturesOrderSmartBuy(resp['userid'], exchangeName, orderDetails)
                             print(resp123l)
+                            twm.stop()
+                            twm1.stop()
+                            loop_status = False
                             # new_order_price = float(trailing_stop)-0.002*float(trailing_stop) # this new order price is good
                             # # above price will be used when and if we to enter  a limit order 
                             # # will clarify this from the client
@@ -414,7 +420,7 @@ class SmartBuyResource(Resource):
                     # these sl steps a locking profits by  updating trailing Buy 
                     print("sl steps",sl_steps)
                     sl_stepss = int(sl_steps)
-                    for i in range(sl_stepss):
+                    for i in range(sl_stepss-1):
 
                         # the below if is a limit order but without trailing_take_profit
                         # else: # trailing_buy is zero, this means off
@@ -438,32 +444,39 @@ class SmartBuyResource(Resource):
                             result1["stop_loss_targets"]["stop_loss_price"] = stop_loss_price
                             # resp["order_details_json"] = result1
                             # below is a new Binance Futures Order with the new entry price as calculated above
-                            orderDetails223 = {
-                                "symbol": exchange_data['symbol'].replace("/", ""),
-                                "side": "Buy",
-                                "type": 'MARKET',
-                                "quantity": real_quantity
-                            }
-                            resp12 = OrderOperations.CreateBinanceFuturesOrderSmartBuy(resp['userid'], exchangeName, orderDetails223)
-                            print("repsonse after creating the initial stop loss",resp12)
-                            exchange_order_id = resp12["result"]["orderId"]
-                            print("exchange_order_id ", exchange_order_id)
-                            # twm.start()
-                            # exchange_order_id = resp12["orderId"]
-                            # print(resp12)
+                            sl_stepss = sl_stepss-1
+                            if sl_stepss == 0:
+                                twm.stop()
+                                twm1.stop()
+                                loop_status = False
+                            else:
+                                orderDetails223 = {
+                                    "symbol": exchange_data['symbol'].replace("/", ""),
+                                    "side": "Sell",
+                                    "type": 'LIMIT',
+                                    "quantity": real_quantity,
+                                    "price": new_order_price, 
+                                    "timeInForce": "GTC"
+                                }
+                                resp12 = OrderOperations.CreateBinanceFuturesOrderSmartBuy(resp['userid'], exchangeName, orderDetails223)
+                                print("repsonse after creating the initial stop loss",resp12)
+                                # exchange_order_id = resp12["result"]["orderId"]
+                                # print("exchange_order_id ", exchange_order_id)
+                                # twm.start()
+                                # exchange_order_id = resp12["orderId"]
+                                # print(resp12)
 
-                            # if resp12: 
-                            #     #the order is still open as a smart order, so we are yet to update it as filled
-                            #     print("the order is still open as a smart order, so we are yet to update it as filled")
-                            #     db.session.query(SmartOrdersModel).filter(SmartOrdersModel.id == resp['userid'], SmartOrdersModel.exchange_order_id == exchange_order_id).update(SmartOrdersModel.exchange_order_id == exchange_order_id, SmartOrdersModel.sl_steps == int(sl_steps)-1, SmartOrdersModel.price == str(new_order_price), SmartOrdersModel.order_details_json == result1)
-                            #     db.session.commit() 
-                                #the new_order_price is the order price.  That will be used to place new orders
-                                # update the order as filled so that it's not querried for filling
-                                # print("update the order as filled so that it's not querried for filling")
-                                # db.session.query(SmartOrdersModel).filter(SmartOrdersModel.id == resp['userid']).update(SmartOrdersModel.status == 'filled')
-                                # db.session.commit() 
+                                # if resp12: 
+                                #     #the order is still open as a smart order, so we are yet to update it as filled
+                                #     print("the order is still open as a smart order, so we are yet to update it as filled")
+                                #     db.session.query(SmartOrdersModel).filter(SmartOrdersModel.id == resp['userid'], SmartOrdersModel.exchange_order_id == exchange_order_id).update(SmartOrdersModel.exchange_order_id == exchange_order_id, SmartOrdersModel.sl_steps == int(sl_steps)-1, SmartOrdersModel.price == str(new_order_price), SmartOrdersModel.order_details_json == result1)
+                                #     db.session.commit() 
+                                    #the new_order_price is the order price.  That will be used to place new orders
+                                    # update the order as filled so that it's not querried for filling
+                                    # print("update the order as filled so that it's not querried for filling")
+                                    # db.session.query(SmartOrdersModel).filter(SmartOrdersModel.id == resp['userid']).update(SmartOrdersModel.status == 'filled')
+                                    # db.session.commit() 
 
-                        sl_stepss = sl_stepss-1
 
                     steps2 = steps1
                     # print(f'JSON PAYLOAD TO LOOP: {steps2}')
@@ -479,17 +492,7 @@ class SmartBuyResource(Resource):
                         # print(f'This basically helps us BUY AT DUMPS, the size of a DUMP equals to trailing_buy % passed')
                         # print(f'This means the trailing_buy % passed MUST be greater than the stop loss or trailing stop values for this function to function efefctively')
                         if trailing_buy == floated_stop_loss_price_target or floated_stop_loss_price_target > trailing_buy:
-                            # but again the quntity below need be a certain % of our position value in usd 
-                            quantity11 = float(steps2[i]["quantity"]) # was calculated during entry
-                            # price221 = trailing_buy
-                            price221 = floated_stop_loss_price_target+floated_stop_loss_price_target*float(steps2[i]["price"])/100
-                            # print("data streamed from binance streams where we want to get the price", price221)
-                            # print("the price above will be used to compare with the set tp price")
-                            float(price221)
-                            print("price fetched from the Binance futures websocket streams" , trailing_buy)
-                            # if price11 == trailing_buy or trailing_buy > price11: # it means here that the target has been hit
-                            # the res as a new config then I will update this new TP steps to the   smart order
-
+                            
                             orderDetails = {
                                 "symbol": exchange_data['symbol'].replace("/", ""),
                                 "side": "Sell",
@@ -501,23 +504,11 @@ class SmartBuyResource(Resource):
                             }
                             resp123l = OrderOperations.CreateBinanceFuturesOrderSmartBuy(resp['userid'], exchangeName, orderDetails)
                             print(resp123l)
-                            new_order_price = float(trailing_stop)-0.002*float(trailing_stop) # this new order price is good
-                            # above price will be used when and if we to enter  a limit order 
-                            # will clarify this from the client
-                            stop_loss_price=new_order_price-(new_order_price*float(stop_loss_11)/100)
-                            result1["stop_loss_targets"]["stop_loss_price"] = stop_loss_price
-                            resp["order_details_json"] = result1
-                            # below is a new Binance Futures Order with the new entry price as calculated above
-                            orderDetails223 = {
-                                "symbol": exchange_data['symbol'].replace("/", ""),
-                                "side": "Buy",
-                                "type": 'MARKET',
-                                "quantity": real_quantity
-                            }
-                            resp12 = OrderOperations.CreateBinanceFuturesOrderSmartBuy(resp['userid'], exchangeName, orderDetails223)
-                            print("repsonse after creating the initial stop loss",resp12)
-                            exchange_order_id = resp12["result"]["orderId"]
-                            print("exchange_order_id ", exchange_order_id)
+                            twm.stop()
+                            twm1.stop()
+                            loop_status = False
+                            # exchange_order_id = resp12["result"]["orderId"]
+                            # print("exchange_order_id ", exchange_order_id)
                             # twm.start()
                             # exchange_order_id = resp12["orderId"]
                             # print(resp12)
@@ -539,7 +530,7 @@ class SmartBuyResource(Resource):
                                 # db.session.commit() 
 
 
-                    for i in range(size_of_tp):
+                    for i in range(size_of_tp-1):
                         # else: 
                         # price11 = float(steps2[i]["price"])
                         price11 = floated_stop_loss_price_target+floated_stop_loss_price_target*float(steps2[i]["price"])/100  # noqa: E501
@@ -564,7 +555,6 @@ class SmartBuyResource(Resource):
                             }
                             resp123l = OrderOperations.CreateBinanceFuturesOrderSmartBuy(resp['userid'], exchangeName, orderDetails)
                             print(resp123l)
-
                             # if resp123l: 
                             new_order_price = float(steps2[i]["price"]) # this new order price is good and thus cannot be a limit order
                             # but will be updated on the smartOrder price.  This is very necessary incase price starts going down and needs
@@ -573,17 +563,23 @@ class SmartBuyResource(Resource):
                             #if a step is hit, I should remove it from steps and update SmartOrdersModel
                             result1["stop_loss_targets"]["stop_loss_price"] = float(resp['price']) # for tp, entry price becomes sl 
                             resp['price'] = steps2[i]["price"]  # then after entry becoming sl, we also make entry same value as hit tp
+                            
                             steps2.remove(i) #after removing a step from the TPs available, I will add the step2 param to 
                             # resp["order_details_json"] = result1
                             # below is a new Binance Futures Order with the new entry price as calculated above
                             #the order is still open as a smart order, so we are yet to update it as filled
-
+                        
                             steps2.remove(i) #after removing a step from the TPs available, I will add the step2 param to 
                             # print("the order is still open as a smart order, so we are yet to update it as filled")
                             # db.session.query(SmartOrdersModel).filter(SmartOrdersModel.id == resp['userid'], SmartOrdersModel.exchange_order_id == exchange_order_id).update(SmartOrdersModel.exchange_order_id == exchange_order_id, SmartOrdersModel.amt == new_order_quantity, SmartOrdersModel.price == str(new_order_price), SmartOrdersModel.order_details_json == result1)
                             # db.session.commit() 
+                            size_of_tp = size_of_tp-1
+                            if size_of_tp == 0:
+                                twm.stop()
+                                twm1.stop()
+                                loop_status = False
 
-                        size_of_tp = size_of_tp-1
+                        
 
                     #end of checking stop loss conditions
                     # tp computations start here
@@ -614,7 +610,7 @@ class SmartBuyResource(Resource):
                 print("updated", floated_stop_loss_price_target)
                 
                 # while it's true that we have the streamed live data above 
-                while True:
+                while loop_status:
                     print("we are in the vloop")
                     print("price within while True Loop")
                     print(price)
