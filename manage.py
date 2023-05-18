@@ -43,6 +43,8 @@ mail = Mail(app)
 # Instantiating websocket
 socketio = SocketIO(app, cors_allowed_origins="*")
 
+CORS(app, resources={r"/*": {"origins": "*"}}, support_credentials=True)
+
 cli = FlaskGroup(app)
 
 
