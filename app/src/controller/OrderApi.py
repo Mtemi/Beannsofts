@@ -36,8 +36,8 @@ getAcctBalance = OrderDto.getAcctBalance
 
 @api.route('/list_orders/', endpoint='list_orders')
 class ListTrades(Resource):
-    @login_required
     @api.doc(params={'symbol': 'trading symbol', 'startDate': 'startDate', 'endDate': 'the end date'})
+    @login_required
     def get(self, user):
         symbol = request.args.get('symbol')
         startDate = request.args.get('startDate')
