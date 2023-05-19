@@ -1,6 +1,6 @@
 from flask.json import jsonify
 from app.src.services.BinanceFuturesOpeartions import BinanceFuturesOps
-from app.src.models import OrdersModel, ExchangeModel, orders
+from app.src.models import OrdersModel, ExchangeModel, orders, SmartOrdersModel
 from app.src import db
 from time import gmtime, strftime
 import json
@@ -465,7 +465,7 @@ def allBinancePlacedOrders(user):
     #         return json.JSONEncoder.default(self, obj)
 
     try:
-        orders = db.session.query(OrdersModel).filter(OrdersModel.user_id == user).all()
+        orders = db.session.query(SmartOrdersModel).filter(SmartOrdersModel.userid == user).all()
         db.session.commit()
 
         result = []
@@ -473,23 +473,23 @@ def allBinancePlacedOrders(user):
         for i in range(len(orders)):
             order = {
                 "id":orders[i].id,
-                "binance_order_id":orders[i].binance_order_id, 
+                "smart_order_type":orders[i].smart_order_type,
+                "exchange_id":orders[i].exchange_id,
+                "exchange_order_id":orders[i].exchange_order_id,
+                "sl_steps":orders[i].sl_steps,
+                "userid":orders[i].userid,
+                "task_id":orders[i].task_id,
                 "symbol":orders[i].symbol,
-                "transactTime":orders[i].transactTime, 
-                "price":orders[i].price,
-                "origQty":orders[i].origQty, 
-                "executedQty":orders[i].executedQty,
-                "cummulativeQuoteQty":orders[i].cummulativeQuoteQty, 
-                "status":orders[i].status,
-                "timeInForce":orders[i].timeInForce, 
-                "type":orders[i].type,
                 "side":orders[i].side,
-                "fills":orders[i].fills,
-                "created_on":str(orders[i].created_on),
-                "bot_id":orders[i].bot_id,
-                "exchange_type": orders[i].exchange_type,
-                "origType":orders[i].origType,
-                "positionSide":orders[i].positionSide,
+                "amt":orders[i].amt,
+                "price":orders[i].price,
+                "order_details_json":orders[i].order_details_json,
+                # "created_on":orders[i].created_on,
+                # "modified_on":orders[i].modified_on,
+                "status":orders[i].status,
+                "executed_on":orders[i].executed_on,
+                "change_reason":orders[i].change_reason,
+                
             }
             result.append(order)
             # openOrders = json.dumps(orders, cls=AlchemyEncoder, separators=None)

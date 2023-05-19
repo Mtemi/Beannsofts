@@ -3,6 +3,7 @@ from flask_restx import Resource
 from flask import request, send_from_directory, send_file
 
 from app.src.models.exchange import ExchangeModel
+from app.src.models.smartorders import SmartOrdersModel
 from . import login_required
 from app.src import db
 import csv
@@ -16,7 +17,7 @@ from app.src.services import OrderOperations
 from app.src.services.BinanceFuturesOpeartions import BinanceFuturesOps
 
 from app.src.utils.binance.streams import ThreadedWebsocketManager
-import ccxt
+
 from pprint import pprint
 from app.src.utils.binance.clientOriginal import Client as BinanceClient
 
@@ -521,3 +522,51 @@ class AssetBalances(Resource):
         userId = user.id
         symbol = request.json['symbol']
         return OrderOperations.getAssetBalance(userId, exchangeName, symbol)
+    
+    
+@api.route('/close/order')
+class CloseOrders(Resource):
+    #all orders saved in the database
+    # @api.doc(params={'userId':'user id'})
+    @api.doc(params={'exchange_order_id': 'the exchange order id to update the status'})
+    @login_required
+    def post(self, user):
+        exchange_order_id = request.args.get('exchange_order_id')
+        userId =user.id
+        
+        print("Exchange id: ",exchange_order_id, "User ID: ", userId)
+        
+        if not exchange_order_id and userId:
+            logger.exception("Exchange order id or user id not passed")
+            
+            if exchange_order_id:
+                logger.info("Exchange order id is :", exchange_order_id)
+                
+            elif userId:
+                logger.info("User id is :", userId)
+                
+            else:
+                logger.exception("Neither Exchange order id and user id are passed")
+        
+        
+        try:
+            
+            db.session.query(SmartOrdersModel).filter(SmartOrdersModel.id == userId,  SmartOrdersModel.exchange_order_id == str(exchange_order_id)).update({SmartOrdersModel.status: 'filled'})
+            db.session.commit()
+            
+            # close order on binance
+                       
+            
+            resp = {
+                "status": "OK",
+                "result": "Status updated successfully",           
+            }
+            
+            return resp, 200
+            
+        except Exception as e:
+            return {
+                "status": "400",
+                "message": str(e)
+            }   
+        
