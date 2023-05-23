@@ -303,9 +303,9 @@ class DeleteExchange(Resource):
                 exchange.status = StatusEnum.DELETED.value
                 db.session.commit()
                 return {
-                "status": 404,
-                "message": "Exchange deleted successfully"
-            }, 404
+                "status": 200,
+                "message": "Exchange deleted successfully(status set to deleted)"
+            }, 200
              
         
         else:
