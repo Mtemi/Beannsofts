@@ -39,13 +39,17 @@ class SmartBuyResource(Resource):
     @login_required
     def post(self,user):
         print(request.json)
+        limit_price = 0
         smart_order_type = request.json['smart_order_type']
         exchange_data = request.json['exchange_data']
         take_profit_targets = request.json['take_profit_targets']
         stop_loss_targets = request.json['stop_loss_targets']
         leverage_type = request.json['leverage_type']
         leverage_value = request.json['leverage']
-        notional_amount = float(exchange_data['amount'])
+        notional_amount = float(exchange_data['amount']) 
+        if bool(exchange_data['limit_price']) is True:
+            limit_price = float(exchange_data['limit_price'])
+            print("limit_price", limit_price)
 
         print("user", user)
         userId = user.id
@@ -119,7 +123,7 @@ class SmartBuyResource(Resource):
 
         if exch_user_info['status']:
 
-            if take_profit_targets['take_profit_order_type'] == 'market':  
+            if smart_order_type == 'market':  
                 orderDetails = {
                     "symbol": symbol,
                     "side": "Buy",
@@ -143,15 +147,19 @@ class SmartBuyResource(Resource):
                 else:  
                     print(resp12)
                 
-            if take_profit_targets['take_profit_order_type'] == 'limit':
+            if smart_order_type == 'limit':
+
+                print("EXECUTING LIMIT ORDER WITH PRICE OF", limit_price)
                 orderDetails = {
                     "symbol": symbol,
                     "side": "Buy",
                     "type": 'LIMIT',
                     "quantity": real_quantity,
-                    "price": float(exchange_data['amount']), #FIXME for limit you must pass the price
+                    "price": round(limit_price, 4),#FIXME for limit you must pass the price
+                    "reduceOnly": False,
                     "timeInForce": "GTC"
                 }
+                print("DATA PASSED TO BINANCE FOR LIMIT ORDER", orderDetails)
 
                 resp12 = OrderOperations.CreateBinanceFuturesOrderSmartBuy(userId, exchangeName, orderDetails)
                 print(resp12)
@@ -177,26 +185,44 @@ class SmartBuyResource(Resource):
                     }
 
             configs.update({"telegram_id": user.telegram_id})
-        
-            todb = {
-                "smart_order_type": smart_order_type,
-                "exchange_id":exchange_data['exchange_id'],
-                "exchange_order_id":exchange_order_id,
-                "sl_steps":stop_loss_targets['stop_steps'],
-                "userid":user.id,
-                "symbol":exchange_data['symbol'],
-                "side":"Buy",
-                "amt":exchange_data['amount'],
-                "price":price,
-                "order_details_json": configs
-            }
+            todb = {}
+            if bool(stop_loss_targets) is True:
+                todb = {
+                    "smart_order_type": smart_order_type,
+                    "exchange_id":exchange_data['exchange_id'],
+                    "exchange_order_id":exchange_order_id,
+                    "sl_steps":stop_loss_targets['stop_steps'],
+                    "userid":user.id,
+                    "symbol":exchange_data['symbol'],
+                    "side":"Buy",
+                    "amt":exchange_data['amount'],
+                    "leverage_type":leverage_type,
+                    "leverage_value":leverage_value,
+                    "price":price,
+                    "order_details_json": configs
+                }
+            else: 
+                todb = {
+                    "smart_order_type": smart_order_type,
+                    "exchange_id":exchange_data['exchange_id'],
+                    "exchange_order_id":exchange_order_id,
+                    "sl_steps":0,
+                    "userid":user.id,
+                    "symbol":exchange_data['symbol'],
+                    "side":"Buy",
+                    "amt":exchange_data['amount'],
+                    "leverage_type":leverage_type,
+                    "leverage_value":leverage_value,
+                    "price":price,
+                    "order_details_json": configs
+                }
             print("DATA TO BE PUSHED TO DB")
             print(todb)
             # the first order either market or limit which gave us the order ID was not saved here in the database . We only need 
             # to pick that orders, orderId and pass to the exchange_order_id parameter for the sl and tp order below.
-            # order = SmartOrdersModel(**todb)
-            # db.session.add(order)
-            # db.session.commit()
+            order = SmartOrdersModel(**todb)
+            db.session.add(order)
+            db.session.commit()
             exchange_data.update({"temp_order_id":exchange_order_id})
 
             configs1 = {
@@ -217,8 +243,6 @@ class SmartBuyResource(Resource):
             }
 
             #   Here we will use the configs1 to activate smart order.  
-
-
 
             """
             consolidates all the smart buy checker units into one entity and user configurations... creating the Smart buy functionality
@@ -383,9 +407,24 @@ class SmartBuyResource(Resource):
                             }
                             resp123l = OrderOperations.CreateBinanceFuturesOrderSmartBuy(resp['userid'], exchangeName, orderDetails)
                             print(resp123l)
-                            twm.stop()
-                            twm1.stop()
-                            loop_status = False
+                            if resp123l["status"] == 'fail':
+                                print("we add a notofication return to the bot")
+                                # return {"message":"Fail", "result": str(resp123l["result"])}, 500
+                            print(" ^^^^^^^^^^^^^^^^^^^^^^^^^")
+                            if resp123l["status"] == 'ok' or resp123l["status"] == 'Ok' or resp123l["status"] == 'OK':
+                                last_price = OrderOperations.getSymbolLastPrice1(userId, exchangeName, symbol)
+                                print(last_price)
+                                price = last_price
+                                exchange_order_id1 = resp123l["result"]["orderId"]
+                                print("exchange_order_id LIMIT", exchange_order_id1)
+                                db.session.query(SmartOrdersModel).filter(SmartOrdersModel.id == resp['userid'],  SmartOrdersModel.status == "open", SmartOrdersModel.side == "Buy", SmartOrdersModel.exchange_order_id == exchange_order_id).update({SmartOrdersModel.exchange_order_id == exchange_order_id1, SmartOrdersModel.price == str(price), SmartOrdersModel.status == 'filled'})
+                                db.session.commit() 
+                                twm.stop()
+                                twm1.stop()
+                                loop_status = False
+                            else:  
+                                print(resp123l)
+
                             # new_order_price = float(trailing_stop)-0.002*float(trailing_stop) # this new order price is good
                             # # above price will be used when and if we to enter  a limit order 
                             # # will clarify this from the client
@@ -446,6 +485,11 @@ class SmartBuyResource(Resource):
                             # below is a new Binance Futures Order with the new entry price as calculated above
                             sl_stepss = sl_stepss-1
                             if sl_stepss == 0:
+                                last_price = OrderOperations.getSymbolLastPrice1(userId, exchangeName, symbol)
+                                print(last_price)
+                                price = last_price
+                                db.session.query(SmartOrdersModel).filter(SmartOrdersModel.id == resp['userid'], SmartOrdersModel.side == "Buy", SmartOrdersModel.status == "open",  SmartOrdersModel.symbol == symbol).update({SmartOrdersModel.price == str(price), SmartOrdersModel.status == 'filled'})
+                                db.session.commit() 
                                 twm.stop()
                                 twm1.stop()
                                 loop_status = False
@@ -504,9 +548,24 @@ class SmartBuyResource(Resource):
                             }
                             resp123l = OrderOperations.CreateBinanceFuturesOrderSmartBuy(resp['userid'], exchangeName, orderDetails)
                             print(resp123l)
-                            twm.stop()
-                            twm1.stop()
-                            loop_status = False
+
+                            if resp123l["status"] == 'fail':
+                                print("we add a notofication return to the bot")
+                                # return {"message":"Fail", "result": str(resp123l["result"])}, 500
+                            print(" ^^^^^^^^^^^^^^^^^^^^^^^^^")
+                            if resp123l["status"] == 'ok' or resp123l["status"] == 'Ok' or resp123l["status"] == 'OK':
+                                last_price = OrderOperations.getSymbolLastPrice1(userId, exchangeName, symbol)
+                                print(last_price)
+                                price = last_price
+                                exchange_order_id1 = resp123l["result"]["orderId"]
+                                print("exchange_order_id LIMIT", exchange_order_id1)
+                                db.session.query(SmartOrdersModel).filter(SmartOrdersModel.id == resp['userid'],  SmartOrdersModel.status == "open", SmartOrdersModel.side == "Buy", SmartOrdersModel.exchange_order_id == exchange_order_id).update({SmartOrdersModel.exchange_order_id == exchange_order_id1, SmartOrdersModel.price == str(price), SmartOrdersModel.status == 'filled'})
+                                db.session.commit() 
+                                twm.stop()
+                                twm1.stop()
+                                loop_status = False
+                            else:  
+                                print(resp123l)
                             # exchange_order_id = resp12["result"]["orderId"]
                             # print("exchange_order_id ", exchange_order_id)
                             # twm.start()
@@ -575,6 +634,11 @@ class SmartBuyResource(Resource):
                             # db.session.commit() 
                             size_of_tp = size_of_tp-1
                             if size_of_tp == 0:
+                                last_price = OrderOperations.getSymbolLastPrice1(userId, exchangeName, symbol)
+                                print(last_price)
+                                price = last_price
+                                db.session.query(SmartOrdersModel).filter(SmartOrdersModel.id == resp['userid'], SmartOrdersModel.side == "Buy", SmartOrdersModel.status == "open",  SmartOrdersModel.symbol == symbol).update({SmartOrdersModel.price == str(price), SmartOrdersModel.status == 'filled'})
+                                db.session.commit() 
                                 twm.stop()
                                 twm1.stop()
                                 loop_status = False
@@ -676,6 +740,8 @@ class SmartSellResource(Resource):
         exchange_data = request.json['exchange_data']
         take_profit_targets = request.json['take_profit_targets']
         stop_loss_targets = request.json['stop_loss_targets']
+        leverage_type = request.json['leverage_type']
+        leverage_value = request.json['leverage']
         user = db.session.query(UserModel).filter_by(id=userId).first()
         exch_user_info = verifyExchange(user.id, "binance-futures", exchange_id=exchange_data['exchange_id'])
         if exch_user_info['status']:
@@ -694,6 +760,8 @@ class SmartSellResource(Resource):
                 "symbol":exchange_data['symbol'],
                 "side":"Sell",
                 "amt":exchange_data['amount'],
+                "leverage_type":leverage_type,
+                "leverage_value":leverage_value,
                 "order_details_json": configs
             }
             order = SmartOrdersModel(**todb)
@@ -737,6 +805,8 @@ class SmartCoverResource(Resource):
         trailing_buy = request.json['trailing_buy']
         order_type = request.json['order_type']
         trigger_price = request.json['trigger_price']
+        leverage_type = request.json['leverage_type']
+        leverage_value = request.json['leverage']
 
         
 
@@ -761,6 +831,8 @@ class SmartCoverResource(Resource):
                 "symbol":exchange_data['symbol'],
                 "side":"Sell",
                 "amt":exchange_data['amount'],
+                "leverage_type":leverage_type,
+                "leverage_value":leverage_value,
                 "order_details_json": configs
             }
             order = SmartOrdersModel(**todb)
