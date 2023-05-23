@@ -58,6 +58,9 @@ class BinanceFuturesOps(BinanceClient):
         """
         Returns a value rounded down to a specific number of decimal places.
         """
+        
+        number = round(float(number))
+        
         if not isinstance(decimals, int):
             raise TypeError("decimal places must be an integer")
         elif decimals < 0:
@@ -66,6 +69,7 @@ class BinanceFuturesOps(BinanceClient):
             return math.floor(number)
 
         factor = 10 ** decimals
+        
         return math.floor(number * factor) / factor
 
     def authenticateKeys(self):

@@ -18,7 +18,8 @@ def exchangesSerializer(exchanges):
         "exchange_name": exchange.exchange_name,
         "key": exchange.key,
         "secret": exchange.secret,
-        "exchange_type": exchange.exchange_type
+        "exchange_type": exchange.exchange_type,
+        "status": exchange.status,
     } for exchange in exchanges ]
 
 def getAllExchanges(user):

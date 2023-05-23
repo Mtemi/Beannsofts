@@ -27,6 +27,8 @@ class SmartOrdersModel(BaseClass, db.Model):
     # order_type = db.Column(db.String(25), nullable=False)
     amt = db.Column(db.Float(),nullable=False)
     price = db.Column(db.Float(),nullable=False)
+    leverage_type = db.Column(db.String(25), nullable=False)
+    leverage_value = db.Column(db.String(25), nullable=False)
     order_details_json = db.Column(db.PickleType())
     created_on = db.Column(db.DateTime, nullable=False)
     modified_on = db.Column(db.DateTime, nullable=True)
@@ -35,7 +37,7 @@ class SmartOrdersModel(BaseClass, db.Model):
     change_reason =db.Column(db.String(255), nullable=True, default=None)
 
 
-    def __init__(self,smart_order_type, exchange_id, exchange_order_id, sl_steps, userid, symbol,side, amt,price, order_details_json, task_id=None, modified_on=None, status="open", executed_on=None, change_reason=None):
+    def __init__(self,smart_order_type, exchange_id, exchange_order_id, sl_steps, userid, symbol,side, amt,price, leverage_type, leverage_value, order_details_json, task_id=None, modified_on=None, status="open", executed_on=None, change_reason=None):
         self.smart_order_type = smart_order_type
         self.exchange_id = exchange_id
         self.exchange_order_id = exchange_order_id
@@ -47,6 +49,8 @@ class SmartOrdersModel(BaseClass, db.Model):
         # self.order_type = order_type
         self.amt = amt
         self.price = price
+        self.leverage_type = leverage_type
+        self.leverage_value = leverage_value
         self.order_details_json = order_details_json
         self.created_on = datetime.datetime.utcnow()
         self.modified_on = modified_on

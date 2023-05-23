@@ -5,6 +5,8 @@ from app.src import db
 from time import gmtime, strftime
 import json
 from app.src.utils import logging
+from datetime import date, datetime
+import json
 
 from app.src.services.binanceoperations import BinanceOps
 logger = logging.GetLogger(__name__)
@@ -467,9 +469,19 @@ def allBinancePlacedOrders(user):
     try:
         orders = db.session.query(SmartOrdersModel).filter(SmartOrdersModel.userid == user).all()
         db.session.commit()
+        
+        print(f"Orders : {orders}")
+        print(f"Orders leverage : {orders[0].leverage_type}")
 
         result = []
-                
+        
+        def json_serializer(obj):
+            if isinstance(obj, (datetime, date)):
+                return obj.isoformat()
+            raise TypeError(f'Type {type(obj)} is not serializable')
+        
+        now = datetime.now()
+        
         for i in range(len(orders)):
             order = {
                 "id":orders[i].id,
@@ -483,11 +495,15 @@ def allBinancePlacedOrders(user):
                 "side":orders[i].side,
                 "amt":orders[i].amt,
                 "price":orders[i].price,
+                "leverage_type":orders[i].leverage_type,
+                "leverage_value":orders[i].leverage_value,
                 "order_details_json":orders[i].order_details_json,
                 # "created_on":orders[i].created_on,
                 # "modified_on":orders[i].modified_on,
+                "created_on":json.dumps(orders[i].created_on, default=json_serializer),
+                # "modified_on":json.dumps(orders[i].modified_on, default=json_serializer),
                 "status":orders[i].status,
-                "executed_on":orders[i].executed_on,
+                # "executed_on":json.dumps(orders[i].executed_on, default=json_serializer),
                 "change_reason":orders[i].change_reason,
                 
             }

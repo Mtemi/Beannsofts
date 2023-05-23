@@ -4,6 +4,8 @@ from flask import request, send_from_directory, send_file
 
 from app.src.models.exchange import ExchangeModel
 from app.src.models.smartorders import SmartOrdersModel
+from app.src.models.users import UserModel
+
 from . import login_required
 from app.src import db
 import csv
@@ -20,6 +22,7 @@ from app.src.utils.binance.streams import ThreadedWebsocketManager
 
 from pprint import pprint
 from app.src.utils.binance.clientOriginal import Client as BinanceClient
+from app.src.services.SmartTrades.SmartBuy.exchangeVerificaton import verifyExchange
 
 
 import math
@@ -104,8 +107,11 @@ class AllOrders(Resource):
             }
 
         data = OrderOperations.ListAllBinanceOrders(userId, exchange_name, symbol)
+        
         result = data[0]['result']
 
+        print(f"The result of listBinanceOrders: {result}")
+        
         if len(result) == 0:
             return {
                 "status": 200,
@@ -510,7 +516,73 @@ class AllOrders(Resource):
     @login_required
     def get(self, user):
         userId = user.id
-        return OrderOperations.allBinancePlacedOrders(userId)
+        
+        try:
+            page = int(request.args.get('page'))
+        except TypeError:
+            return {
+                "status": 200,
+                "message": "error page must be an integer"
+            }
+            
+        data =  OrderOperations.allBinancePlacedOrders(userId)
+        
+        print("__________BINANCE_ORDERS_DATA________________")
+        print(data)
+        
+
+        result = data[0]['result']
+
+        if len(result) == 0:
+            return {
+                "status": 200,
+                "result": result
+            }
+
+        # current page
+        # orders per page
+        per_page = 5
+        # total number of orders
+        total_number = len(result)
+        # total number of pages
+        total_pages = math.ceil(total_number / per_page)
+
+        # check validity of the page
+        if page > total_pages:
+            return {
+                "status": 200,
+                "message": "page number out of range"
+            }
+
+        # start index and end index for list slicing
+        # check if is page 1
+        if page == 1:
+            start_index = 0
+        else:
+            start_index = ((page - 1) * per_page) 
+
+        # check end index
+        end_index = start_index + (per_page - 1)
+
+        # initialize page data starting with none
+        data_in_page = None
+
+        # check if end index is not less than total
+        if not ((end_index) < total_number):
+            end_index = total_number - 1
+        
+        end_index += 1
+        data_in_page = result[start_index:end_index]
+
+        print(f"start index {start_index} endindex {end_index}")
+        final_data = {
+            "status": 200,
+            "total_pages": total_pages,
+            "current_page": page,
+            "result" : data_in_page
+        }
+
+        return final_data
 
 @api.route('/account/balance')
 class AssetBalances(Resource):
@@ -528,22 +600,90 @@ class AssetBalances(Resource):
 class CloseOrders(Resource):
     #all orders saved in the database
     # @api.doc(params={'userId':'user id'})
-    @api.doc(params={'exchange_order_id': 'the exchange order id to update the status'})
+    @api.doc(params={'exchange_order_id': 'the exchange order id to update the status', 'symbol': 'the symbol of the order', 'smart_order_type': 'the smart order type', 'amt': 'the amount of the order'})
     @login_required
     def post(self, user):
         exchange_order_id = request.args.get('exchange_order_id')
+        symbol = request.args.get('symbol')
+        smart_order_type = request.args.get('smart_order_type')
+        quantity = request.args.get('amt')
         userId =user.id
+        
+        print(f"symbol: {symbol}, quantity:{quantity} ")
+        # edit symbol
+        symbol = symbol.replace("/", "")
+        
+        print(f"changed symbol: {symbol} ")
+        
+        user = db.session.query(UserModel).filter_by(id=userId).first()
+        # exch_user_info = verifyExchange(user.id, "binance-futures", exchange_order_id)
+        
+        exchange_name = db.session.query(ExchangeModel.exchange_name).filter_by(user_id=userId, exchange_type="binance-futures").first()
+        
+
+        exchangeName = str(exchange_name)[2:-3]
+        print("exchangeName: ", exchangeName)
+        
+        
+        last_price = OrderOperations.getSymbolLastPrice1(userId, exchangeName, symbol)
+        print("Symbol Last Price: ",last_price)
+        price  = float(last_price)
+        
+        if smart_order_type == 'market':  
+            orderDetails = {
+                "symbol": symbol,
+                "side": "Sell",
+                "type": 'LIMIT',
+                "quantity": quantity,
+                "price": price, 
+                "reduceOnly": True,
+                "timeInForce": "GTC"
+            }
+            print("__________________here1________________________")
+            resp123l = OrderOperations.CreateBinanceFuturesOrderSmartBuy(userId, exchangeName, orderDetails)
+            print(resp123l)
+            print("__________________here2________________________")
+            if resp123l["status"] == 'fail':
+                print("we add a notification return to the bot")
+                # return {"message":"Fail", "result": str(resp123l["result"])}, 500
+            print(" ^^^^^^^^^^^^^^^^^^^^^^^^^")
+            if resp123l["status"] == 'ok' or resp123l["status"] == 'Ok' or resp123l["status"] == 'OK':
+                # last_price = OrderOperations.getSymbolLastPrice1(userId, exchangeName, symbol)
+                # print(last_price)
+                # price = last_price
+                exchange_order_id1 = resp123l["result"]["orderId"]
+                print("exchange_order_id LIMIT", exchange_order_id1)
+            
+        if smart_order_type == 'limit':
+            # closing limit order
+            resp12 = OrderOperations.cancelBinanceFuturesOrderSmartBuy(userId, exchangeName, orderDetails_Mode)
+            logger.info("The response is: \n",resp12)
+            logger.info("The response status is: \n", resp12["status"])
+
+            logger.info(" ^^^^^^^^^^^CLOSING AN OPEN POSITION^^^^^^^^^^^^^^")
+            if resp12["status"] == 'ok' or resp12["status"] == 'Ok' or resp12["status"] == 'OK':
+                last_price = OrderOperations.getSymbolLastPrice1(userId, exchangeName, symbol)
+                print(last_price)
+        
+        orderDetails_Mode = {
+            "symbol": symbol,
+            "orderId": exchange_order_id,
+        }
+
+        
+        
         
         print("Exchange id: ",exchange_order_id, "User ID: ", userId)
         
-        if not exchange_order_id and userId:
+        # Will print info when either exchange_order_id or userId is not passed
+        if not exchange_order_id or not userId:
             logger.exception("Exchange order id or user id not passed")
             
-            if exchange_order_id:
-                logger.info("Exchange order id is :", exchange_order_id)
+            if not exchange_order_id and userId:
+                logger.info("Exchange order id is not passed, User id is :", userId)
                 
-            elif userId:
-                logger.info("User id is :", userId)
+            elif not userId and exchange_order_id:
+                logger.info("User id is not passed, Exchange order id is :", exchange_order_id)
                 
             else:
                 logger.exception("Neither Exchange order id and user id are passed")
@@ -551,18 +691,48 @@ class CloseOrders(Resource):
         
         try:
             
-            db.session.query(SmartOrdersModel).filter(SmartOrdersModel.id == userId,  SmartOrdersModel.exchange_order_id == str(exchange_order_id)).update({SmartOrdersModel.status: 'filled'})
-            db.session.commit()
+            print("__________________Change_Status______________________")
+            # Query the record based on user_id and exchange_order_id
+            order = SmartOrdersModel.query.filter_by(userid=userId, exchange_order_id=str(exchange_order_id)).first()
+
+            if order:
+                # Update the status to 'filled'
+                order.status = 'filled'
+                db.session.commit()
+                
+                resp = {
+                    "status": "OK",
+                    "result": "Order status updated successfully to 'filled.'",           
+                }
+                
+                return resp, 200
+            
+            else:
+                
+                logger.error("_________Order not found__________")
+                resp = {
+                    "status": "NOT FOUND",
+                    "result": "Order not found.",           
+                }
+                
+                return resp, 404
+            
+            
+            
+            # db.session.query(SmartOrdersModel).filter(SmartOrdersModel.user == userId,  SmartOrdersModel.exchange_order_id == str(exchange_order_id)).update({SmartOrdersModel.status: 'filled'})
+            # db.session.commit()
+            
+            # # test if order status is updated
+            # order = db.session.query(SmartOrdersModel).filter(SmartOrdersModel.id == userId,  SmartOrdersModel.exchange_order_id == str(exchange_order_id)).first()            
+            # if order.status == 'filled':
+            #     logger.info("Order status is filled")
+            
+            # else:
+            #     logger.info("Order status is still open", order.status)
+            
             
             # close order on binance
-                       
             
-            resp = {
-                "status": "OK",
-                "result": "Status updated successfully",           
-            }
-            
-            return resp, 200
             
         except Exception as e:
             return {
