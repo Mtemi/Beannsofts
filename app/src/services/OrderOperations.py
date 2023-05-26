@@ -353,6 +353,7 @@ def CreateBinanceFuturesOrder(user, exchange_name, orderDetails):
     secret = ApiData.secret
 
     try:
+        print("Symbol is:  ", orderDetails['symbol'])
         BinanceFuturesClient = BinanceFuturesOps(api_key=key, api_secret=secret, trade_symbol=orderDetails['symbol'])
         newOrder = BinanceFuturesClient.sendOrder(orderDetails)
 
@@ -372,7 +373,7 @@ def CreateBinanceFuturesOrder(user, exchange_name, orderDetails):
             return resp, 200
 
     except Exception as e:
-        logger.exception("Create Order Exception")
+        logger.exception("_________Create Order Exception__________")
         resp = {
             "status": "fail",
             "result": str(e),
@@ -530,6 +531,183 @@ def allBinancePlacedOrders(user):
             "message": "error occured. Check parameters"            
         }
         return resp, 400
+
+
+def filledBinancePlacedOrders(user):
+    # from sqlalchemy.ext.declarative import DeclarativeMeta
+
+    # TODO #FIXME implement this serializer method in future to see if it optimizes
+    # class AlchemyEncoder(json.JSONEncoder):
+
+    #     def default(self, obj):
+    #         if isinstance(obj.__class__, DeclarativeMeta):
+    #             # an SQLAlchemy class
+    #             fields = {}
+    #             for field in [x for x in dir(obj) if not x.startswith('_') and x != 'metadata']:
+    #                 data = obj.__getattribute__(field)
+    #                 try:
+    #                     json.dumps(data) # this will fail on non-encodable values, like other classes
+    #                     fields[field] = data
+    #                 except TypeError:
+    #                     fields[field] = None
+    #             # a json-encodable dict
+    #             return fields
+
+    #         return json.JSONEncoder.default(self, obj)
+
+    try:
+        orders = db.session.query(SmartOrdersModel).filter(SmartOrdersModel.userid == user, SmartOrdersModel.status == "filled").all()
+        db.session.commit()
+        
+        print(f"Orders : {orders}")
+        print(f"Orders leverage : {orders[0].leverage_type}")
+
+        result = []
+        
+        def json_serializer(obj):
+            if isinstance(obj, (datetime, date)):
+                return obj.isoformat()
+            raise TypeError(f'Type {type(obj)} is not serializable')
+        
+        now = datetime.now()
+        
+        for i in range(len(orders)):
+            order = {
+                "id":orders[i].id,
+                "smart_order_type":orders[i].smart_order_type,
+                "exchange_id":orders[i].exchange_id,
+                "exchange_order_id":orders[i].exchange_order_id,
+                "sl_steps":orders[i].sl_steps,
+                "userid":orders[i].userid,
+                "task_id":orders[i].task_id,
+                "symbol":orders[i].symbol,
+                "side":orders[i].side,
+                "amt":orders[i].amt,
+                "price":orders[i].price,
+                "leverage_type":orders[i].leverage_type,
+                "leverage_value":orders[i].leverage_value,
+                "order_details_json":orders[i].order_details_json,
+                # "created_on":orders[i].created_on,
+                # "modified_on":orders[i].modified_on,
+                "created_on":json.dumps(orders[i].created_on, default=json_serializer),
+                # "modified_on":json.dumps(orders[i].modified_on, default=json_serializer),
+                "status":orders[i].status,
+                # "executed_on":json.dumps(orders[i].executed_on, default=json_serializer),
+                "change_reason":orders[i].change_reason,
+                
+            }
+            result.append(order)
+            # openOrders = json.dumps(orders, cls=AlchemyEncoder, separators=None)
+
+        if result != False:
+            resp = {
+                "status": "OK",
+                "result": result,           
+            }
+            return resp, 200
+        else:
+            resp = {
+                "status": "OK",
+                "result": [],           
+            }
+            return resp, 200
+    except Exception as e:
+        logger.exception("Position Exception", e)
+        resp = {
+            "status": "fail",
+            "result": str(e),
+            "message": "error occured. Check parameters"            
+        }
+        return resp, 400
+
+
+def SmartOrderTypeBinancePlacedOrders(user, type):
+    # from sqlalchemy.ext.declarative import DeclarativeMeta
+
+    # TODO #FIXME implement this serializer method in future to see if it optimizes
+    # class AlchemyEncoder(json.JSONEncoder):
+
+    #     def default(self, obj):
+    #         if isinstance(obj.__class__, DeclarativeMeta):
+    #             # an SQLAlchemy class
+    #             fields = {}
+    #             for field in [x for x in dir(obj) if not x.startswith('_') and x != 'metadata']:
+    #                 data = obj.__getattribute__(field)
+    #                 try:
+    #                     json.dumps(data) # this will fail on non-encodable values, like other classes
+    #                     fields[field] = data
+    #                 except TypeError:
+    #                     fields[field] = None
+    #             # a json-encodable dict
+    #             return fields
+
+    #         return json.JSONEncoder.default(self, obj)
+
+    try:
+        orders = db.session.query(SmartOrdersModel).filter(SmartOrdersModel.userid == user, SmartOrdersModel.status == "open" ,SmartOrdersModel.smart_order_type == type).all()
+        db.session.commit()
+        
+        print(f"Orders : {orders}")
+        print(f"Orders leverage : {orders[0].leverage_type}")
+
+        result = []
+        
+        def json_serializer(obj):
+            if isinstance(obj, (datetime, date)):
+                return obj.isoformat()
+            raise TypeError(f'Type {type(obj)} is not serializable')
+        
+        now = datetime.now()
+        
+        for i in range(len(orders)):
+            order = {
+                "id":orders[i].id,
+                "smart_order_type":orders[i].smart_order_type,
+                "exchange_id":orders[i].exchange_id,
+                "exchange_order_id":orders[i].exchange_order_id,
+                "sl_steps":orders[i].sl_steps,
+                "userid":orders[i].userid,
+                "task_id":orders[i].task_id,
+                "symbol":orders[i].symbol,
+                "side":orders[i].side,
+                "amt":orders[i].amt,
+                "price":orders[i].price,
+                "leverage_type":orders[i].leverage_type,
+                "leverage_value":orders[i].leverage_value,
+                "order_details_json":orders[i].order_details_json,
+                # "created_on":orders[i].created_on,
+                # "modified_on":orders[i].modified_on,
+                "created_on":json.dumps(orders[i].created_on, default=json_serializer),
+                # "modified_on":json.dumps(orders[i].modified_on, default=json_serializer),
+                "status":orders[i].status,
+                # "executed_on":json.dumps(orders[i].executed_on, default=json_serializer),
+                "change_reason":orders[i].change_reason,
+                
+            }
+            result.append(order)
+            # openOrders = json.dumps(orders, cls=AlchemyEncoder, separators=None)
+
+        if result != False:
+            resp = {
+                "status": "OK",
+                "result": result,           
+            }
+            return resp, 200
+        else:
+            resp = {
+                "status": "OK",
+                "result": [],           
+            }
+            return resp, 200
+    except Exception as e:
+        logger.exception("Position Exception", e)
+        resp = {
+            "status": "fail",
+            "result": str(e),
+            "message": "error occured. Check parameters"            
+        }
+        return resp, 400
+    
 
 def getAssetBalance(userId, exchangeName, symbol):
     ApiData = fetchBinanceKeys(userId, exchangeName)

@@ -598,22 +598,24 @@ class AssetBalances(Resource):
     
 @api.route('/close/order')
 class CloseOrders(Resource):
-    #all orders saved in the database
-    # @api.doc(params={'userId':'user id'})
-    @api.doc(params={'exchange_order_id': 'the exchange order id to update the status', 'symbol': 'the symbol of the order', 'smart_order_type': 'the smart order type', 'amt': 'the amount of the order'})
     @login_required
-    def post(self, user):
+    def delete(self, user):
         exchange_order_id = request.args.get('exchange_order_id')
-        symbol = request.args.get('symbol')
+        unfiltered_symbol = request.args.get('symbol')
         smart_order_type = request.args.get('smart_order_type')
         quantity = request.args.get('amt')
+        # exchange_order_id = request.json['exchange_order_id']
+        # symbol = request.json['symbol']
+        # smart_order_type = request.json['smart_order_type']
+        # quantity = request.json['amt']
         userId =user.id
         
-        print(f"symbol: {symbol}, quantity:{quantity} ")
+        print(f"Unfiltered symbol: {unfiltered_symbol}, quantity:{quantity} ")
         # edit symbol
-        symbol = symbol.replace("/", "")
+        filtered_symbol = unfiltered_symbol.replace("/", "")
+        symbol = filtered_symbol.upper()
         
-        print(f"changed symbol: {symbol} ")
+        print(f"Filtered symbol: {symbol} ")
         
         user = db.session.query(UserModel).filter_by(id=userId).first()
         # exch_user_info = verifyExchange(user.id, "binance-futures", exchange_order_id)
@@ -654,8 +656,15 @@ class CloseOrders(Resource):
                 exchange_order_id1 = resp123l["result"]["orderId"]
                 print("exchange_order_id LIMIT", exchange_order_id1)
             
+        
+        
         if smart_order_type == 'limit':
+            orderDetails_Mode = {
+            "symbol": symbol,
+            "orderId": exchange_order_id,
+            }
             # closing limit order
+            
             resp12 = OrderOperations.cancelBinanceFuturesOrderSmartBuy(userId, exchangeName, orderDetails_Mode)
             logger.info("The response is: \n",resp12)
             logger.info("The response status is: \n", resp12["status"])
@@ -664,12 +673,6 @@ class CloseOrders(Resource):
             if resp12["status"] == 'ok' or resp12["status"] == 'Ok' or resp12["status"] == 'OK':
                 last_price = OrderOperations.getSymbolLastPrice1(userId, exchangeName, symbol)
                 print(last_price)
-        
-        orderDetails_Mode = {
-            "symbol": symbol,
-            "orderId": exchange_order_id,
-        }
-
         
         
         
@@ -718,25 +721,238 @@ class CloseOrders(Resource):
                 return resp, 404
             
             
-            
-            # db.session.query(SmartOrdersModel).filter(SmartOrdersModel.user == userId,  SmartOrdersModel.exchange_order_id == str(exchange_order_id)).update({SmartOrdersModel.status: 'filled'})
-            # db.session.commit()
-            
-            # # test if order status is updated
-            # order = db.session.query(SmartOrdersModel).filter(SmartOrdersModel.id == userId,  SmartOrdersModel.exchange_order_id == str(exchange_order_id)).first()            
-            # if order.status == 'filled':
-            #     logger.info("Order status is filled")
-            
-            # else:
-            #     logger.info("Order status is still open", order.status)
-            
-            
-            # close order on binance
-            
-            
         except Exception as e:
             return {
                 "status": "400",
                 "message": str(e)
             }   
         
+        
+# filtered orders
+@api.route('/all/filled/orders')
+class All_Filled_Orders(Resource):
+    #all orders saved in the database
+    # @api.doc(params={'userId':'user id'})
+    @login_required
+    def get(self, user):
+        userId = user.id
+        
+        try:
+            page = int(request.args.get('page'))
+        except TypeError:
+            return {
+                "status": 200,
+                "message": "error page must be an integer"
+            }
+            
+        data =  OrderOperations.filledBinancePlacedOrders(userId)
+        
+        print("__________BINANCE_ORDERS_DATA________________")
+        print(data)
+        
+
+        result = data[0]['result']
+
+        if len(result) == 0:
+            return {
+                "status": 200,
+                "result": result
+            }
+
+        # current page
+        # orders per page
+        per_page = 5
+        # total number of orders
+        total_number = len(result)
+        # total number of pages
+        total_pages = math.ceil(total_number / per_page)
+
+        # check validity of the page
+        if page > total_pages:
+            return {
+                "status": 200,
+                "message": "page number out of range"
+            }
+
+        # start index and end index for list slicing
+        # check if is page 1
+        if page == 1:
+            start_index = 0
+        else:
+            start_index = ((page - 1) * per_page) 
+
+        # check end index
+        end_index = start_index + (per_page - 1)
+
+        # initialize page data starting with none
+        data_in_page = None
+
+        # check if end index is not less than total
+        if not ((end_index) < total_number):
+            end_index = total_number - 1
+        
+        end_index += 1
+        data_in_page = result[start_index:end_index]
+
+        print(f"start index {start_index} endindex {end_index}")
+        final_data = {
+            "status": 200,
+            "total_pages": total_pages,
+            "current_page": page,
+            "result" : data_in_page
+        }
+
+        return final_data
+    
+@api.route('/all/open/market/orders')
+class All_Open_Market_Orders(Resource):
+    #all orders saved in the database
+    # @api.doc(params={'userId':'user id'})
+    @login_required
+    def get(self, user):
+        userId = user.id
+        
+        try:
+            page = int(request.args.get('page'))
+        except TypeError:
+            return {
+                "status": 200,
+                "message": "error page must be an integer"
+            }
+            
+        type = 'market'
+            
+        data =  OrderOperations.SmartOrderTypeBinancePlacedOrders(userId, type)
+        
+        print("__________BINANCE_ORDERS_DATA________________")
+        print(data)
+        
+
+        result = data[0]['result']
+
+        if len(result) == 0:
+            return {
+                "status": 200,
+                "result": result
+            }
+
+        # current page
+        # orders per page
+        per_page = 5
+        # total number of orders
+        total_number = len(result)
+        # total number of pages
+        total_pages = math.ceil(total_number / per_page)
+
+        # check validity of the page
+        if page > total_pages:
+            return {
+                "status": 200,
+                "message": "page number out of range"
+            }
+
+        # start index and end index for list slicing
+        # check if is page 1
+        if page == 1:
+            start_index = 0
+        else:
+            start_index = ((page - 1) * per_page) 
+
+        # check end index
+        end_index = start_index + (per_page - 1)
+
+        # initialize page data starting with none
+        data_in_page = None
+
+        # check if end index is not less than total
+        if not ((end_index) < total_number):
+            end_index = total_number - 1
+        
+        end_index += 1
+        data_in_page = result[start_index:end_index]
+
+        print(f"start index {start_index} endindex {end_index}")
+        final_data = {
+            "status": 200,
+            "total_pages": total_pages,
+            "current_page": page,
+            "result" : data_in_page
+        }
+
+        return final_data
+    
+@api.route('/all/open/limit/orders')
+class All_Open_Limit_Orders(Resource):
+    #all orders saved in the database
+    # @api.doc(params={'userId':'user id'})
+    @login_required
+    def get(self, user):
+        userId = user.id
+        
+        try:
+            page = int(request.args.get('page'))
+        except TypeError:
+            return {
+                "status": 200,
+                "message": "error page must be an integer"
+            }
+            
+        type = 'limit'
+        data =  OrderOperations.SmartOrderTypeBinancePlacedOrders(userId, type)
+        
+        print("__________BINANCE_ORDERS_DATA________________")
+        print(data)
+        
+
+        result = data[0]['result']
+
+        if len(result) == 0:
+            return {
+                "status": 200,
+                "result": result
+            }
+
+        # current page
+        # orders per page
+        per_page = 5
+        # total number of orders
+        total_number = len(result)
+        # total number of pages
+        total_pages = math.ceil(total_number / per_page)
+
+        # check validity of the page
+        if page > total_pages:
+            return {
+                "status": 200,
+                "message": "page number out of range"
+            }
+
+        # start index and end index for list slicing
+        # check if is page 1
+        if page == 1:
+            start_index = 0
+        else:
+            start_index = ((page - 1) * per_page) 
+
+        # check end index
+        end_index = start_index + (per_page - 1)
+
+        # initialize page data starting with none
+        data_in_page = None
+
+        # check if end index is not less than total
+        if not ((end_index) < total_number):
+            end_index = total_number - 1
+        
+        end_index += 1
+        data_in_page = result[start_index:end_index]
+
+        print(f"start index {start_index} endindex {end_index}")
+        final_data = {
+            "status": 200,
+            "total_pages": total_pages,
+            "current_page": page,
+            "result" : data_in_page
+        }
+
+        return final_data
