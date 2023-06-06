@@ -333,7 +333,7 @@ def startPriceStreams(streams: List[str], api_key, api_secret):
         # redisConn.set(price_data['stream'], pickle.dumps(price_data))
         bookTicker.append(price_data)
         if len(bookTicker) >= len(streams):
-            logger.info(
+            # logger.info(
                 # f"price_data  value is {price_data} ...")
                 # f"BookTicker for {streams} updated successifully, restarting task...")
             twm.stop()

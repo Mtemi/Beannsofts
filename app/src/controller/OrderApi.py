@@ -1,13 +1,14 @@
 from ast import Pass
 from flask_restx import Resource
 from flask import request, send_from_directory, send_file
+from numpy import broadcast
 
 from app.src.models.exchange import ExchangeModel
 from app.src.models.smartorders import SmartOrdersModel
 from app.src.models.users import UserModel
 
 from . import login_required
-from app.src import db
+from app.src import db, app
 import csv
 
 from app.src.utils.dto import OrderDto
@@ -23,11 +24,14 @@ from app.src.utils.binance.streams import ThreadedWebsocketManager
 from pprint import pprint
 from app.src.utils.binance.clientOriginal import Client as BinanceClient
 from app.src.services.SmartTrades.SmartBuy.exchangeVerificaton import verifyExchange
-
+from flask_socketio import SocketIO, emit, send
+from flask_cors import CORS
 
 import math
 
 
+# Instantiating websocket
+socketio = SocketIO(app, cors_allowed_origins="*")
 
 logger = logging.GetLogger(__name__)
 
@@ -37,6 +41,9 @@ createOrderSpot = OrderDto.createOrderSpot
 createOrderFutures = OrderDto.createOrderFutures
 getAcctBalance = OrderDto.getAcctBalance
 
+
+
+test_ = "James"
 
 @api.route('/list_orders/', endpoint='list_orders')
 class ListTrades(Resource):
@@ -209,167 +216,6 @@ class CreateBinanceFuturesOrder(Resource):
         return OrderOperations.CreateBinanceFuturesOrder(userId, exchangeName, orderDetails)
 
 
-# @api.route('/open_orders/binance')
-# class OpenOrders(Resource):
-#     @api.doc("Get all open orders from binance")
-#     @api.doc(params={'exchange_name': 'the exchange name to get api data from'})
-#     @login_required
-#     def get(self,user):
-#         exchange_name = request.args.get('exchange_name')
-#         userId =user.id
-#         return OrderOperations.ListBinancePositions(userId, exchange_name)
-
-
-# @api.route('/open_orders/binance')
-# class OpenOrders(Resource):
-#     @api.doc("Get all open orders from binance")
-#     @api.doc(params={'exchange_name': 'the exchange name to get api data from'})
-#     @login_required
-#     def get(self,user):
-#         exchange_name = request.args.get('exchange_name')
-#         userId =user.id
-#         def fetchBinanceKeys(user, exchange_name):
-#             return db.session.query(ExchangeModel).filter(ExchangeModel.user_id == user, ExchangeModel.exchange_name == exchange_name).first()
-
-#         def ListBinancePositions(user, exchange_name):
-#             ApiData = fetchBinanceKeys(user, exchange_name)
-#             if ApiData:
-#                 key = ApiData.key
-#                 secret = ApiData.secret
-#                 exchange_type = ApiData.exchange_type
-#                 if exchange_type == "binance":
-#                     try:
-#                         BinanceClient = BinanceOps(api_key=key, api_secret=secret, trade_symbol="BTCUSDT")
-#                         openOrders = BinanceClient.checkAllOPenOrders()
-#                         if openOrders != False:
-#                             resp = {
-#                                 "status": "OK",
-#                                 "result": openOrders,           
-#                             }
-#                             return resp, 200
-#                         else:
-#                             resp = {
-#                                 "status": "OK",
-#                                 "result": [],           
-#                             }
-#                             return resp, 200
-#                     except Exception as e:
-#                         logger.exception("Position Exception", e)
-#                         resp = {
-#                             "status": "fail",
-#                             "result": str(e),
-#                             "message": "error occured. Check parameters"            
-#                         }
-#                         return resp, 400
-                    
-#                 elif exchange_type == "binance-futures":
-#                     try:
-#                         BinaceFuturesClient = BinanceFuturesOps(api_key=key, api_secret=secret, trade_symbol="BTCUSDT")
-#                         openOrders = BinaceFuturesClient.checkAllOPenOrders()
-#                         if openOrders != False:
-#                             resp = {
-#                                 "status": "OK",
-#                                 "result": openOrders,           
-#                             }
-#                             return resp, 200
-#                         else:
-#                             resp = {
-#                                 "status": "OK",
-#                                 "result": [],           
-#                             }
-#                             return resp, 200
-#                     except Exception as e:
-#                         logger.exception("Position Exception", e)
-#                         resp = {
-#                             "status": "fail",
-#                             "result": str(e),
-#                             "message": "error occured. Check parameters"            
-#                         }
-#                         return resp, 400
-#             else:
-#                 resp = {
-#                     "status": "ok",
-#                     "result": [],
-#                     "message": "no positions"            
-#                 }
-#                 return resp, 400
-
-#         ApiData = fetchBinanceKeys(user, exchange_name)
-#         key = ApiData.key
-#         secret = ApiData.secret
-#         twm = ThreadedWebsocketManager(api_key=key, api_secret=secret)
-
-#         # start is required to initialise its internal loop
-#         twm.start()
-
-#         # def handle_socket_message(msg):
-#         #     print(f"message type: {msg['e']}")
-#         #     print(msg)
-
-#         def getOpenPositions_Future():
-#             client = BinanceClient(api_key=key, api_secret=secret)
-#             positions = client.futures_account()['positions']
-#             return positions
-        
-#         # exchange = ccxt.binance({
-#         #     'enableRateLimit': True,  # required by the Manual https://github.com/ccxt/ccxt/wiki/Manual#rate-limit
-#         #     'apiKey': 'YOUR_API_KEY',
-#         #     'secret': 'YOUR_API_SECRET',
-#         #     'options': {  # exchange-specific options
-#         #         'defaultType': 'future',  # switch to a futures API/account
-#         #     },
-#         # })
-
-#         # pprint(exchange.fetch_positions(['SAND/BUSD']))
-
-#         open_position = twm.start_kline_socket(callback=getOpenPositions_Future, symbol="BTCUSDT")
-
-#         # return open_position
-
-#         return OrderOperations.ListBinancePositions(userId, exchange_name)
-
-
-# similar example implementation
-# @api.route('/open_orders/binance')
-# class OpenOrders(Resource):
-#     @api.doc("Get all open orders from binance")
-#     @api.doc(params={'exchange_name': 'the exchange name to get api data from'})
-#     @login_required
-#     def get(self,user):
-#         exchange_name = request.args.get('exchange_name')
-#         userId =user.id
-
-#         def fetchBinanceKeys(user, exchange_name):
-#             return db.session.query(ExchangeModel).filter(ExchangeModel.user_id == user, ExchangeModel.exchange_name == exchange_name).first()
-
-#         ApiData = fetchBinanceKeys(user, exchange_name)
-#         key = ApiData.key
-#         secret = ApiData.secret
-
-#         bm = ThreadedWebsocketManager(api_key=key, api_secret=secret)
-
-#         def handle_user_data(msg):
-#             if msg['e'] == 'outboundAccountPosition':
-#                 # Parse the position data from the WebSocket message
-#                 positions = []
-#                 for asset in msg['B']:
-#                     positions.append({
-#                         'symbol': asset['a'],
-#                         'amount': float(asset['f']),
-#                         'available': float(asset['f']) - float(asset['l'])
-#                     })
-#                 print(positions)
-
-#         # Subscribe to the user data WebSocket
-#         bm.start_user_socket(callback=handle_user_data)
-
-#         # Wait for WebSocket events
-#         bm.join()
-
-#         # Get the open orders from the Binance API
-#         orders = OrderOperations.ListBinancePositions(userId, exchange_name)
-#         return orders
-
 
 # same functionality but added with getting balance
 @api.route('/open_orders/binance')
@@ -510,13 +356,20 @@ class OpenPositions(Resource):
 
         
 @api.route('/all/orders')
-class AllOrders(Resource):
+class All_Orders(Resource):
+    
+    # def calculation(self, test):
+    #     global test_
+    #     test_ = test
+    #     return test
+    
     #all orders saved in the database
     # @api.doc(params={'userId':'user id'})
     @login_required
     def get(self, user):
+        # global test_
         userId = user.id
-        
+       
         try:
             page = int(request.args.get('page'))
         except TypeError:
@@ -526,6 +379,10 @@ class AllOrders(Resource):
             }
             
         data =  OrderOperations.allBinancePlacedOrders(userId)
+        # test_ = "Hello"
+        # self.calculation(test)
+        
+        
         
         print("__________BINANCE_ORDERS_DATA________________")
         print(data)
@@ -600,6 +457,7 @@ class AssetBalances(Resource):
 class CloseOrders(Resource):
     @login_required
     def delete(self, user):
+        socketio.emit('close_order', {'data': 'close order'})
         exchange_order_id = request.args.get('exchange_order_id')
         unfiltered_symbol = request.args.get('symbol')
         smart_order_type = request.args.get('smart_order_type')
@@ -729,80 +587,91 @@ class CloseOrders(Resource):
         
         
 # filtered orders
-@api.route('/all/filled/orders')
-class All_Filled_Orders(Resource):
-    #all orders saved in the database
-    # @api.doc(params={'userId':'user id'})
-    @login_required
-    def get(self, user):
-        userId = user.id
+# @api.route('/all/filled/orders')
+# class All_Filled_Orders(Resource):
+#     #all orders saved in the database
+#     # @api.doc(params={'userId':'user id'})
+#     @login_required
+#     def get(self, user):
+#         global test_
+#         @socketio.on("message")
+#         def connected():
+#             """event listener when client connects to the server"""
+#             print(user.id)
+#             print("client has connected")
+#             emit("message",{"data":f"user of id: {user.id} is connected"}, broadcast= True)
+#         # socketio.emit('testing1', {'data': 'This is a test'}, broadcast=True)  
+#         userId = user.id
         
-        try:
-            page = int(request.args.get('page'))
-        except TypeError:
-            return {
-                "status": 200,
-                "message": "error page must be an integer"
-            }
+#         try:
+#             page = int(request.args.get('page'))
+#         except TypeError:
+#             return {
+#                 "status": 200,
+#                 "message": "error page must be an integer"
+#             }
             
-        data =  OrderOperations.filledBinancePlacedOrders(userId)
+#         data =  OrderOperations.filledBinancePlacedOrders(userId)
+#         test_ = "Hello"
+#         print(f"__________GLOAL_VARIABLE_CHANGE_TO_{test_}________________")
+       
         
-        print("__________BINANCE_ORDERS_DATA________________")
-        print(data)
+#         print("__________BINANCE_ORDERS_DATA________________")
+#         print(data)
         
 
-        result = data[0]['result']
+#         result = data[0]['result']
 
-        if len(result) == 0:
-            return {
-                "status": 200,
-                "result": result
-            }
+#         if len(result) == 0:
+#             return {
+#                 "status": 200,
+#                 "result": result
+#             }
 
-        # current page
-        # orders per page
-        per_page = 5
-        # total number of orders
-        total_number = len(result)
-        # total number of pages
-        total_pages = math.ceil(total_number / per_page)
+#         # current page
+#         # orders per page
+#         per_page = 5
+#         # total number of orders
+#         total_number = len(result)
+#         # total number of pages
+#         total_pages = math.ceil(total_number / per_page)
 
-        # check validity of the page
-        if page > total_pages:
-            return {
-                "status": 200,
-                "message": "page number out of range"
-            }
+#         # check validity of the page
+#         if page > total_pages:
+#             return {
+#                 "status": 200,
+#                 "message": "page number out of range"
+#             }
 
-        # start index and end index for list slicing
-        # check if is page 1
-        if page == 1:
-            start_index = 0
-        else:
-            start_index = ((page - 1) * per_page) 
+#         # start index and end index for list slicing
+#         # check if is page 1
+#         if page == 1:
+#             start_index = 0
+#         else:
+#             start_index = ((page - 1) * per_page) 
 
-        # check end index
-        end_index = start_index + (per_page - 1)
+#         # check end index
+#         end_index = start_index + (per_page - 1)
 
-        # initialize page data starting with none
-        data_in_page = None
+#         # initialize page data starting with none
+#         data_in_page = None
 
-        # check if end index is not less than total
-        if not ((end_index) < total_number):
-            end_index = total_number - 1
+#         # check if end index is not less than total
+#         if not ((end_index) < total_number):
+#             end_index = total_number - 1
         
-        end_index += 1
-        data_in_page = result[start_index:end_index]
+#         end_index += 1
+#         data_in_page = result[start_index:end_index]
 
-        print(f"start index {start_index} endindex {end_index}")
-        final_data = {
-            "status": 200,
-            "total_pages": total_pages,
-            "current_page": page,
-            "result" : data_in_page
-        }
+#         print(f"start index {start_index} endindex {end_index}")
+#         final_data = {
+#             "status": 200,
+#             "total_pages": total_pages,
+#             "current_page": page,
+#             "result" : data_in_page
+#         }
 
-        return final_data
+#         return final_data
     
 @api.route('/all/open/market/orders')
 class All_Open_Market_Orders(Resource):
