@@ -190,8 +190,18 @@ def ListBinanceOpenPositions(user, exchange_name):
 
 def ListAllBinanceOrders(user, exchange_name, symbol):
     ApiData = fetchBinanceKeys(user, exchange_name)
-    key = ApiData.key
-    secret = ApiData.secret
+    if ApiData:
+        key = ApiData.key
+        secret = ApiData.secret
+    else:
+        resp = {
+            "status": "fail",
+            "result": "No Api Data",
+            "message": "No Api Data"            
+        }
+        return resp, 500
+    # key = ApiData.key
+    # secret = ApiData.secret
 
     try:
         BinaceClient = BinanceOps(api_key=key, api_secret=secret, trade_symbol=symbol)
@@ -647,58 +657,117 @@ def SmartOrderTypeBinancePlacedOrders(user, type):
         orders = db.session.query(SmartOrdersModel).filter(SmartOrdersModel.userid == user, SmartOrdersModel.status == "open" ,SmartOrdersModel.smart_order_type == type).all()
         db.session.commit()
         
-        print(f"Orders : {orders}")
-        print(f"Orders leverage : {orders[0].leverage_type}")
+        if orders:
+            print(f"Number of orders: {len(orders)}")
+            print(f"Orders : {orders}")
+            if len(orders) > 0:
+                print(f"Orders leverage: {orders[0].leverage_type}")
+            # print(f"Orders leverage : {orders[0].leverage_type}")
 
-        result = []
-        
-        def json_serializer(obj):
-            if isinstance(obj, (datetime, date)):
-                return obj.isoformat()
-            raise TypeError(f'Type {type(obj)} is not serializable')
-        
-        now = datetime.now()
-        
-        for i in range(len(orders)):
-            order = {
-                "id":orders[i].id,
-                "smart_order_type":orders[i].smart_order_type,
-                "exchange_id":orders[i].exchange_id,
-                "exchange_order_id":orders[i].exchange_order_id,
-                "sl_steps":orders[i].sl_steps,
-                "userid":orders[i].userid,
-                "task_id":orders[i].task_id,
-                "symbol":orders[i].symbol,
-                "side":orders[i].side,
-                "amt":orders[i].amt,
-                "price":orders[i].price,
-                "leverage_type":orders[i].leverage_type,
-                "leverage_value":orders[i].leverage_value,
-                "order_details_json":orders[i].order_details_json,
-                # "created_on":orders[i].created_on,
-                # "modified_on":orders[i].modified_on,
-                "created_on":json.dumps(orders[i].created_on, default=json_serializer),
-                # "modified_on":json.dumps(orders[i].modified_on, default=json_serializer),
-                "status":orders[i].status,
-                # "executed_on":json.dumps(orders[i].executed_on, default=json_serializer),
-                "change_reason":orders[i].change_reason,
-                
-            }
-            result.append(order)
-            # openOrders = json.dumps(orders, cls=AlchemyEncoder, separators=None)
+            result = []
+            
+            def json_serializer(obj):
+                if isinstance(obj, (datetime, date)):
+                    return obj.isoformat()
+                raise TypeError(f'Type {type(obj)} is not serializable')
+            
+            now = datetime.now()
+            
+            for i in range(len(orders)):
+                order = {
+                    "id":orders[i].id,
+                    "smart_order_type":orders[i].smart_order_type,
+                    "exchange_id":orders[i].exchange_id,
+                    "exchange_order_id":orders[i].exchange_order_id,
+                    "sl_steps":orders[i].sl_steps,
+                    "userid":orders[i].userid,
+                    "task_id":orders[i].task_id,
+                    "symbol":orders[i].symbol,
+                    "side":orders[i].side,
+                    "amt":orders[i].amt,
+                    "price":orders[i].price,
+                    "leverage_type":orders[i].leverage_type,
+                    "leverage_value":orders[i].leverage_value,
+                    "order_details_json":orders[i].order_details_json,
+                    # "created_on":orders[i].created_on,
+                    # "modified_on":orders[i].modified_on,
+                    "created_on":json.dumps(orders[i].created_on, default=json_serializer),
+                    # "modified_on":json.dumps(orders[i].modified_on, default=json_serializer),
+                    "status":orders[i].status,
+                    # "executed_on":json.dumps(orders[i].executed_on, default=json_serializer),
+                    "change_reason":orders[i].change_reason,
+                    
+                }
+                result.append(order)
+                # openOrders = json.dumps(orders, cls=AlchemyEncoder, separators=None)
 
-        if result != False:
-            resp = {
-                "status": "OK",
-                "result": result,           
-            }
-            return resp, 200
+            if result != False:
+                resp = {
+                    "status": "OK",
+                    "result": result,           
+                }
+                return resp, 200
+            else:
+                resp = {
+                    "status": "OK",
+                    "result": [],           
+                }
+                return resp, 200
+        
         else:
-            resp = {
-                "status": "OK",
-                "result": [],           
-            }
-            return resp, 200
+            print("No orders found.")
+        # print(f"Orders : {orders}")
+        # print(f"Orders leverage : {orders[0].leverage_type}")
+
+        # result = []
+        
+        # def json_serializer(obj):
+        #     if isinstance(obj, (datetime, date)):
+        #         return obj.isoformat()
+        #     raise TypeError(f'Type {type(obj)} is not serializable')
+        
+        # now = datetime.now()
+        
+        # for i in range(len(orders)):
+        #     order = {
+        #         "id":orders[i].id,
+        #         "smart_order_type":orders[i].smart_order_type,
+        #         "exchange_id":orders[i].exchange_id,
+        #         "exchange_order_id":orders[i].exchange_order_id,
+        #         "sl_steps":orders[i].sl_steps,
+        #         "userid":orders[i].userid,
+        #         "task_id":orders[i].task_id,
+        #         "symbol":orders[i].symbol,
+        #         "side":orders[i].side,
+        #         "amt":orders[i].amt,
+        #         "price":orders[i].price,
+        #         "leverage_type":orders[i].leverage_type,
+        #         "leverage_value":orders[i].leverage_value,
+        #         "order_details_json":orders[i].order_details_json,
+        #         # "created_on":orders[i].created_on,
+        #         # "modified_on":orders[i].modified_on,
+        #         "created_on":json.dumps(orders[i].created_on, default=json_serializer),
+        #         # "modified_on":json.dumps(orders[i].modified_on, default=json_serializer),
+        #         "status":orders[i].status,
+        #         # "executed_on":json.dumps(orders[i].executed_on, default=json_serializer),
+        #         "change_reason":orders[i].change_reason,
+                
+        #     }
+        #     result.append(order)
+        #     # openOrders = json.dumps(orders, cls=AlchemyEncoder, separators=None)
+
+        # if result != False:
+        #     resp = {
+        #         "status": "OK",
+        #         "result": result,           
+        #     }
+        #     return resp, 200
+        # else:
+        #     resp = {
+        #         "status": "OK",
+        #         "result": [],           
+        #     }
+        #     return resp, 200
     except Exception as e:
         logger.exception("Position Exception", e)
         resp = {
