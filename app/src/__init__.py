@@ -17,9 +17,9 @@ def create_app(config_name: str) -> Flask:
     app.config.from_object(config_by_name[config_name])
     app.config["REDIS_URL"] = Config.REDIS_URL
     app.register_blueprint(sse, url_prefix='/stream')
-    app.config['MONGODB_SETTINGS'] = {
-        'host': Config.MONGODB_HOST+'/crypttops-3c?authSource=admin',
-    }
+    # app.config['MONGODB_SETTINGS'] = {
+    #     'host': Config.MONGODB_HOST+'/crypttops-3c?authSource=admin',
+    # }
     CORS(app)
     db.init_app(app)
     app.config['MONGODB_CONNECT'] = False
@@ -27,4 +27,4 @@ def create_app(config_name: str) -> Flask:
     return app
 
 
-app = create_app(os.getenv('BOILERPLATE_ENV') or 'dev')
+app = create_app('dev')

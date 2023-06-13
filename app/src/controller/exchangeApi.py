@@ -1,4 +1,3 @@
-from app.src.models.exchange import ExchangeEnum
 from app.src.services.SubscriptionOperations import subscriptionType, filterPlanActions
 from flask_restx import Resource, abort
 from . import login_required
@@ -7,7 +6,7 @@ import datetime
 from time import gmtime, strftime
 from app.src.services import BinanceOps, ExchangeOperations,BinanceFuturesOps
 from app.src.services import BotOperations
-from app.src.models import ExchangeModel, ExchangeEnum
+from app.src.models import ExchangeModel, ExchangeEnum, StatusEnum
 from app.src.models import StatusEnum
 from app.src import db
 
@@ -79,7 +78,7 @@ class AddExchange(Resource):
                 print("Keys None")
                 if binance_service.authenticateKeys() == True:
                     print("Auth Keys")
-                    exchange = ExchangeModel(exchange_name = exch_name, key = api_key, secret =api_secret, user_id = userId, modified_on = None, exchange_type = ExchangeEnum.SPOT.value)
+                    exchange = ExchangeModel(exchange_name = exch_name, key = api_key, secret =api_secret, user_id = userId, modified_on = None, exchange_type = ExchangeEnum.SPOT.value, status = StatusEnum.ACTIVE.value)
                     db.session.add(exchange)
                     db.session.commit()
 
@@ -101,7 +100,7 @@ class AddExchange(Resource):
                 print("Keys None")
                 if binance_service.authenticateKeys() == True:
                     print("Auth Keys")
-                    exchange = ExchangeModel(exchange_name = exch_name, key = api_key, secret =api_secret, user_id = userId, modified_on = None, exchange_type = ExchangeEnum.FUTURES.value)
+                    exchange = ExchangeModel(exchange_name = exch_name, key = api_key, secret =api_secret, user_id = userId, modified_on = None, exchange_type = ExchangeEnum.FUTURES.value, status = StatusEnum.ACTIVE.value)
                     db.session.add(exchange)
                     db.session.commit()
 
@@ -149,7 +148,7 @@ class EditExchange(Resource):
 
             if binance_service.authenticateKeys() == True: 
 
-                db.session.query(ExchangeModel).filter(ExchangeModel.user_id ==userId, ExchangeModel.exchange_name == exch_name).update({ExchangeModel.key:api_key, ExchangeModel.secret:api_secret, ExchangeModel.modified_on:datetime.datetime.now(), ExchangeModel.exchange_type: ExchangeEnum.SPOT.value})
+                db.session.query(ExchangeModel).filter(ExchangeModel.user_id ==userId, ExchangeModel.exchange_name == exch_name).update({ExchangeModel.key:api_key, ExchangeModel.secret:api_secret, ExchangeModel.modified_on:datetime.datetime.now(), ExchangeModel.exchange_type: ExchangeEnum.SPOT.value, ExchangeModel.status: StatusEnum.ACTIVE.value})
                 db.session.commit()
 
                 return {"message":"API data modified successifully","result": {
@@ -167,7 +166,7 @@ class EditExchange(Resource):
 
             if binance_service.authenticateKeys() == True: 
 
-                db.session.query(ExchangeModel).filter(ExchangeModel.user_id ==userId, ExchangeModel.exchange_name == exch_name).update({ExchangeModel.key:api_key, ExchangeModel.secret:api_secret, ExchangeModel.modified_on:datetime.datetime.now(), ExchangeModel.exchange_type: ExchangeEnum.FUTURES.value})
+                db.session.query(ExchangeModel).filter(ExchangeModel.user_id ==userId, ExchangeModel.exchange_name == exch_name).update({ExchangeModel.key:api_key, ExchangeModel.secret:api_secret, ExchangeModel.modified_on:datetime.datetime.now(), ExchangeModel.exchange_type: ExchangeEnum.FUTURES.value, ExchangeModel.status: StatusEnum.ACTIVE.value})
                 db.session.commit()
 
                 return {"message":"API data modified successifully","result": {
