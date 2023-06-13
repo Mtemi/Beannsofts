@@ -4,7 +4,7 @@ from dotenv import load_dotenv
 
 load_dotenv()  # take environment variables from .env.
 
-postgres_local_base = os.getenv('PG_DATABASE_URL')
+postgres_local_base = os.getenv('DATABASE_URI')
 # postgres_local_base = os.environ['DATABASE_URL
 
 basedir = os.path.abspath(os.path.dirname(__file__))
