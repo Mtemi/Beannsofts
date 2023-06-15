@@ -27,12 +27,13 @@ from app.src.services.pnl.pnlcalculator import pnlCalcualtor
 from app.src.services.pnl.utils import getBotTradeDetails
 
 
-from app.src.utils import logging
+# from app.src.utils import logging
 from app import app, db, blueprint
 
 import json
 import time
 import asyncio
+import threading
 
 # smart trade api imports
 from app.src.utils.dto import SmartTradeDto
@@ -59,7 +60,15 @@ msginfo = 'info'
 msgerror = 'error'
 
 
-logger = logging.GetLogger(__name__)
+import logging
+# logger = logging.GetLogger(__name__)
+
+# configure logging
+logging.basicConfig(format='%(asctime)s:%(levelname)s:%(filename)s:%(funcName)s:%(message)s',
+                    datefmt='%Y-%m-%d %H:%M:%S',
+                    level=logging.INFO)
+
+
 
 # ORiginal stuff begins here
 
@@ -205,6 +214,7 @@ class SmartBuyResource(Resource):
                 print(resp12["status"])
                 if resp12["status"] == 'fail':
                     print("we add a return statement here")
+                    socketio.emit('custom_event10', f'Exception message: {resp12["result"]}')
                     return {"message":"Fail", "result": str(resp12["result"])}, 500
                 print(" ^^^^^^^^^^^^^^^^^^^^^^^^^")
                 if resp12["status"] == 'ok' or resp12["status"] == 'Ok' or resp12["status"] == 'OK':
@@ -235,6 +245,8 @@ class SmartBuyResource(Resource):
                 print(resp12["status"])
                 if resp12["status"] == 'fail':
                     print("we add a return statement here")
+                    # Emit a custom event back to the client
+                    socketio.emit('custom_event9', f'Exception message: {resp12["result"]}')
                     return {"message":"Fail", "result": str(resp12["result"])}, 500
                 print(" ^^^^^^^^^^^^^^^^^^^^^^^^^")
                 if resp12["status"] == 'ok' or resp12["status"] == 'Ok' or resp12["status"] == 'OK':
@@ -349,7 +361,7 @@ class SmartBuyResource(Resource):
             exchangeName = configs1['exchange_name']
             print("exchangeName", exchangeName)
 
-            global loop_status
+            # global loop_status
             loop_status = True
 
             try:
@@ -443,6 +455,7 @@ class SmartBuyResource(Resource):
                 def handle_socket_message1(price_data):
                     global trailing_stop
                     global trailing_buy
+                    global loop_status
                     print("SET STOP LOSS PRICE", stop_loss_11)
                     print("trailing_stop init", trailing_stop)
                     print("trailing_buy init", trailing_buy)
@@ -744,9 +757,9 @@ class SmartBuyResource(Resource):
                 
                 @socketio.on('user_event')
                 def handle_user_data(msg):
-                    logger.info("_____Msg__________")
-                    logger.info(msg['m'])
-                    logger.info(msg['p'])
+                    logging.info("_____Msg__________")
+                    logging.info(msg['m'])
+                    logging.info(msg['p'])
                     # print(msg) 
                     socketio.emit(msg['p'])
                     print(json.dumps(msg, indent=4))
@@ -754,43 +767,87 @@ class SmartBuyResource(Resource):
                     # if msg['m'] == "True":
                     #     twm1.stop()
                     #     twm.stop()
-                    #     logger.info("msg['m']")
+                    #     logging.info("msg['m']")
                     #     # return {"message":"Trade Clossed Successfully", "status":400},200
                     # print(msg)
 
                 # twm1.start_trade_socket(callback=handle_user_data,  symbol=symbol)
                 # twm1.start_user_socket(callback=handle_user_data)
-                twm.start_symbol_book_ticker_socket(callback=handle_socket_message1, symbol=symbol)
+                # def start_book_ticker_socket():
+                #     twm.start_symbol_book_ticker_socket(callback=handle_socket_message1, symbol=symbol)
                 
+                twm.start_symbol_book_ticker_socket(callback=handle_socket_message1, symbol=symbol)
                 # twm.start()
                 print("updated", floated_stop_loss_price_target)
                 
-                async def asynchronous_while_loop():
-                    while loop_status:
-                        print("we are in the vloop")
-                        print("price within while True Loop")
-                        print(price)
-                        await asyncio.sleep(1)
-                        twm1.join()  
-                        twm.join()
-                if loop_status:
-                    async_loop = asyncio.get_event_loop()
-                    async_loop.run_until_complete(asynchronous_while_loop())
-                # while loop_status:
-                #     print("we are in the vloop")
-                #     print("price within while True Loop")
-                #     print(price)
-                #     time.sleep(1)
-                #     twm1.join()  
-                #     twm.join() 
+                # async def asynchronous_while_loop():
+                #     while loop_status:
+                #         print("we are in the vloop")
+                #         print("price within while True Loop")
+                #         print(price)
+                #         await asyncio.sleep(1)
+                #         twm1.join()  
+                #         twm.join()
+                # if loop_status:
+                #     async_loop = asyncio.get_event_loop()
+                #     async_loop.run_until_complete(asynchronous_while_loop())
+
+     
+                    
+                # def background_loop():
+                #     iterations = 0
+                #     while loop_status:
+                #         print("we are in the vloop")
+                #         print("price within while True Loop")
+                #         print(price)
+                #         time.sleep(1)
+                #         iterations += 1
+                #         logging.info(f"The loop_status is: {loop_status}")
+                        
+                #     print("loop status set to False")
+                #     print(f"Made {iterations} iterations in the background loop.")
+                #     print("Exiting background loop.")
+                #         # twm1.join()  
+                #         # twm.join()
+                        
+                    
+                # def stop_loop_after_delay():
+                #     time.sleep(30)  # Delay of 20 secs
+                #     global loop_status
+                #     loop_status = False
+                #     logging.info("loop_status set to False")
+                    
+                
+                
+                # # Create a thread for the loop
+                # loop_thread = threading.Thread(target=background_loop)
+                # loop_thread.start()
+                
+                # # creating a thread for the stop_loop_after_delay
+                # stop_loop_thread = threading.Thread(target=stop_loop_after_delay)
+                # stop_loop_thread.start()
+                
+                
+                # # Wait for all threads to finish
+                # loop_thread.join()
+                # # socket_thread.join()
+                # stop_loop_thread.join()
+                    
+                    
+                # # Clean up and stop any necessary operations
+                # twm1.stop()
+                # logging.info("twm1.stop() ACTIVATED")
+                # twm.stop()
+                # logging.info("twm.stop() ACTIVATED")
+                    
                 
                 
                 # while it's true that we have the streamed live data above 
-                # while loop_status:
-                #     print("we are in the vloop")
-                #     print("price within while True Loop")
-                #     print(price)
-                #     time.sleep(1)
+                while loop_status:
+                    print("we are in the vloop")
+                    print("price within while True Loop")
+                    print(price)
+                    time.sleep(1)
                 #     # we ned to update trailing stop loss only when price is above it, for the case of Buy
                 #     # AND if price is below it, then our trailing stop loss algorithm takes over and 
                 #     # if we decide to close our trailing stop loss algorithm , then we will close the open positions
@@ -811,12 +868,12 @@ class SmartBuyResource(Resource):
 
                 #     # twm.start_symbol_book_ticker_socket(
                 #     #     callback=handle_socket_message, symbol=exchange_data["symbol"])
-                #     twm1.join()  
-                #     twm.join()  
+                    twm1.join()  
+                    twm.join()  
                 #     # continue checking until all conditions are met execute the order and close the tasks                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                          
                 
             except Exception as e:
-                logger.error(f"exception hit after filtering terminal orders from db exception {str(e)}")
+                logging.error(f"exception hit after filtering terminal orders from db exception {str(e)}")
                 socketio.emit('custom_event5', f'Server says: Exception type: {str(e)}', broadcast=True) 
                 return {"message":"Fail", "result": str(e)}, 500
                     
@@ -1037,7 +1094,7 @@ def invoiceWebhook():
     except (WebhookInvalidPayload, SignatureVerificationError) as e:
         return str(e), 400
 
-    logger.info("Received event: id={id}, type={type}".format(
+    logging.info("Received event: id={id}, type={type}".format(
         id=event.id, type=event.type))
 
     if "created" in event.type:
@@ -1045,7 +1102,7 @@ def invoiceWebhook():
             "invoice_status":  event.type,
             "modified_on": datetime.datetime.utcnow(),
         }
-        logger.info("paid invoice event")
+        logging.info("paid invoice event")
         invoice = db.session.query(InvoiceModel).filter(
             InvoiceModel.invoice_id == event.data['id']).first()
         # print(invoice)
@@ -1087,7 +1144,7 @@ def invoiceWebhook():
 # class BotError(Resource):
 #     def post(self):
 #         error = request.json
-#         logger.info("Bot error emited")
+#         logging.info("Bot error emited")
 #         socketio.emit(error['userId'], {'error': error}, broadcast=True)
 #         return 200
 
@@ -1102,7 +1159,7 @@ def sendAsyncMail(emailData):
                   recipients=[emailData['to']])
     msg.body = emailData['body']
     with app.app_context():
-        logger.info("async background email sent")
+        logging.info("async background email sent")
         mail.send(msg)
 
 
@@ -1113,12 +1170,12 @@ def sendMail(emailData, app):
                   recipients=[emailData['to']])
     msg.body = emailData['body']
     with app.app_context():
-        logger.info("email sent")
+        logging.info("email sent")
         mail.send(msg)
 
 
 if __name__ == '__main__':
     # cli()
-    socketio.run(app, host='0.0.0.0', port=3010)   
+    socketio.run(app, host='0.0.0.0', port=3020)   
      
 
